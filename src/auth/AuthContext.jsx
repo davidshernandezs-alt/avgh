@@ -71,6 +71,45 @@ export function AuthProvider({ children }) {
     return () => off(profileRef, 'value', handler)
   }, [user, auth])
 
+  // Los empleados inscritos por la empresa se guardaban bajo un uid sintético
+  // (emp_<cedula>). Al crear su cuenta real de Auth hay que mover inscripciones,
+  // facturas y certificados a ese uid para que el perfil vea todo.
+  const migrateLegacyData = async ({ toUid, dni, fromUids = [] }) => {
+    try {
+      const [insSnap, facSnap, certSnap] = await Promise.all([
+        get(ref(db, `${DB_ROOT}/inscripciones`)),
+        get(ref(db, `${DB_ROOT}/facturas`)),
+        get(ref(db, `${DB_ROOT}/certificados`))
+      ])
+      const ins = insSnap.val() || {}
+      const fac = facSnap.val() || {}
+      const cert = certSnap.val() || {}
+      const sources = new Set(fromUids.filter(Boolean))
+      const digits = (dni || '').replace(/\D/g, '')
+      for (const [uid, acts] of Object.entries(ins)) {
+        if (uid.startsWith(`emp_${digits}`)) sources.add(uid)
+        const first = Object.values(acts || {})[0]
+        const d = String(first?.user?.dni || first?.user?.cedula || '').replace(/\D/g, '')
+        if (digits && d === digits) sources.add(uid)
+      }
+      const updates = {}
+      for (const from of sources) {
+        if (!from || from === toUid) continue
+        for (const [node, store] of [['inscripciones', ins], ['facturas', fac], ['certificados', cert]]) {
+          const dataNode = store[from]
+          if (!dataNode) continue
+          for (const [key, value] of Object.entries(dataNode)) {
+            updates[`${DB_ROOT}/${node}/${toUid}/${key}`] = value
+            updates[`${DB_ROOT}/${node}/${from}/${key}`] = null
+          }
+        }
+      }
+      if (Object.keys(updates).length) await update(ref(db, '/'), updates)
+    } catch (e) {
+      console.warn('No se pudieron migrar datos anteriores:', e)
+    }
+  }
+
   const login = async (identifier, password) => {
     const currentAuth = getAuthSafe()
     if (!currentAuth) throw new Error('auth-unavailable')
@@ -90,6 +129,13 @@ export function AuthProvider({ children }) {
     for (const emailTry of possibleEmails) {
       try {
         await signInWithEmailAndPassword(currentAuth, emailTry, password)
+        if (!cleanId.includes('@')) {
+          await migrateLegacyData({
+            toUid: currentAuth.currentUser?.uid,
+            dni: cleanDni,
+            fromUids: [`emp_${cleanDni}`]
+          })
+        }
         return // ¡Inicio de sesión exitoso!
       } catch (err) {
         lastError = err
@@ -106,6 +152,11 @@ export function AuthProvider({ children }) {
             if (u.email && !possibleEmails.includes(u.email.trim().toLowerCase())) {
               try {
                 await signInWithEmailAndPassword(currentAuth, u.email.trim().toLowerCase(), password)
+                await migrateLegacyData({
+                  toUid: currentAuth.currentUser?.uid,
+                  dni: cleanDni,
+                  fromUids: [`emp_${cleanDni}`]
+                })
                 return
               } catch (e) {
                 lastError = e
@@ -144,14 +195,21 @@ export function AuthProvider({ children }) {
                   empresa: comp.nombreEmpresa || '',
                   tipoPersona: 'natural',
                   afiliado: true,
+                  uidOrigen: `emp_${cleanDni}`,
                   fechaRegistro: Date.now()
                 })
+                await migrateLegacyData({ toUid: uid, dni: cleanDni, fromUids: [`emp_${cleanDni}`] })
                 return
               } catch (createErr) {
                 // Si el correo ya estaba en use, intentamos simplemente hacer signIn
                 if (codeOf(createErr) === 'auth/email-already-in-use') {
                   try {
                     await signInWithEmailAndPassword(currentAuth, empEmail, password)
+                    await migrateLegacyData({
+                      toUid: currentAuth.currentUser?.uid,
+                      dni: cleanDni,
+                      fromUids: [`emp_${cleanDni}`]
+                    })
                     return
                   } catch (e) {
                     lastError = e
@@ -208,12 +266,23 @@ export function AuthProvider({ children }) {
               ...u,
               dni: u.dni || cleanDni,
               email,
+              uidOrigen: foundUser.uid || '',
               fechaRegistro: u.fechaRegistro || Date.now()
+            })
+            await migrateLegacyData({
+              toUid: cred.user.uid,
+              dni: cleanDni,
+              fromUids: [foundUser.uid, `emp_${cleanDni}`]
             })
             return
           } catch (createErr) {
             if (codeOf(createErr) === 'auth/email-already-in-use') {
               await signInWithEmailAndPassword(currentAuth, email, password)
+              await migrateLegacyData({
+                toUid: currentAuth.currentUser?.uid,
+                dni: cleanDni,
+                fromUids: [foundUser.uid, `emp_${cleanDni}`]
+              })
               return
             }
             lastError = createErr

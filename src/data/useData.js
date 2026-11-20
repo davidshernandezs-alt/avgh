@@ -193,7 +193,8 @@ export async function createInscription({ uid, actividad, user, metodoPago, esta
     monto,
     fecha,
     metodo: metodoPago,
-    estado: estado === 'confirmada' ? 'aprobada' : 'pendiente'
+    estado: estado === 'confirmada' ? 'completada' : 'pendiente',
+    validadaFecha: estado === 'confirmada' ? fecha : null
   }
 
   const updates = {}
@@ -304,6 +305,7 @@ export async function setInscripcionEstado({ uid, actividadId, estado, nota }) {
     const facturaEstado =
       estado === 'confirmada' ? 'completada' : estado === 'rechazada' ? 'rechazada' : 'pendiente'
     updates[`${DB_ROOT}/facturas/${uid}/${facturaId}/estado`] = facturaEstado
+    updates[`${DB_ROOT}/facturas/${uid}/${facturaId}/validadaFecha`] = Date.now()
   }
   await update(ref(db, '/'), updates)
 }
@@ -344,9 +346,15 @@ export function useAllFacturas() {
                   uData = firstAct.user
                 }
               }
+              let actividadId = data?.actividadId || ''
+              if (!actividadId && insc[uid]) {
+                const match = Object.entries(insc[uid]).find(([, act]) => act?.facturaId === facturaId)
+                if (match) actividadId = match[0]
+              }
               list.push({
                 uid,
                 facturaId,
+                actividadId,
                 factura: data,
                 user: uData
               })

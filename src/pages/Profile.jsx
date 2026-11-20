@@ -546,6 +546,9 @@ export default function Profile() {
           <ul className="list">
             {inscripciones.map((ins) => {
               const isConfirmed = ins.estado === 'confirmada'
+              const inscFactura = facturas.find((f) => f.actividadId === ins.actividadId)
+              const isPaid = ['completada', 'aprobada'].includes(inscFactura?.estado) || (Number(ins.monto) === 0 && isConfirmed)
+              const canShowQr = isConfirmed && isPaid
               return (
                 <li key={ins.actividadId} className="list-item flex-wrap">
                   <div className="list-main">
@@ -555,7 +558,7 @@ export default function Profile() {
                       {ins.monto > 0 ? ` · ${CURRENCY}${ins.monto}` : ''}
                     </span>
                     {ins.nota && <span className="list-sub admin-note">Nota: {ins.nota}</span>}
-                    {isConfirmed && (
+                    {isConfirmed && !isPaid && (
                       <span className="list-sub" style={{ color: 'var(--warn)', fontWeight: 600, marginTop: '4px', display: 'block' }}>
                         ⚠️ {t('profile.invoiceReminder')}
                       </span>
@@ -563,7 +566,7 @@ export default function Profile() {
                   </div>
                   <div className="profile-insc-actions">
                     <span className={`badge badge-${ins.estado}`}>{t(`insc.status${cap(ins.estado)}`)}</span>
-                    {isConfirmed && (
+                    {canShowQr && (
                       <button className="btn btn-outline btn-sm" onClick={() => setShowQr(ins.actividadId)}>
                         QR
                       </button>

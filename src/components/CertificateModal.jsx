@@ -6,6 +6,10 @@ import { formatDate } from '../components/ActivityCard'
 import { useAuth } from '../auth/AuthContext'
 import { saveUserCertificate } from '../data/useData'
 import { downloadCertificatePDF } from '../utils/certificatePdf'
+import firma1Url from '../assets/firma-nombre-1.png'
+import firma2Url from '../assets/firma-nombre-2.png'
+import afiliadoLogo1Url from '../assets/afiliado-logo-1.png'
+import afiliadoLogo2Url from '../assets/afiliado-logo-2.png'
 
 const EMPTY_CERT = {
   nombre: '',
@@ -21,11 +25,11 @@ const EMPTY_CERT = {
   firma1Cargo: 'Directora Ejecutiva AVGH',
   firma2Nombre: 'Almer Bracamonte',
   firma2Cargo: 'Vicepresidente - AVGH',
-  firma1Imagen: '/firma-nombre-1.png',
-  firma2Imagen: '/firma-nombre-2.png',
+  firma1Imagen: firma1Url,
+  firma2Imagen: firma2Url,
   facilitadorImagen: '',
-  afiliadoLogo1: '/afiliado-logo-1.png',
-  afiliadoLogo2: '/afiliado-logo-2.png',
+  afiliadoLogo1: afiliadoLogo1Url,
+  afiliadoLogo2: afiliadoLogo2Url,
   afiliadoLogo3: '',
   afiliadoLogo4: ''
 }
@@ -172,6 +176,7 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
   const viewportRef = useRef(null)
   const scalerRef = useRef(null)
   const [viewScale, setViewScale] = useState(1)
+  const [viewWidth, setViewWidth] = useState(780)
   const [viewHeight, setViewHeight] = useState(0)
 
   useEffect(() => {
@@ -182,6 +187,7 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
       const naturalWidth = 780
       const available = vp.clientWidth || naturalWidth
       const next = Math.min(1, available / naturalWidth)
+      setViewWidth(available)
       setViewScale(next)
       setViewHeight(sc.scrollHeight)
     }
@@ -319,7 +325,13 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
           <div
             className="certificate-scaler"
             ref={scalerRef}
-            style={{ transform: `scale(${viewScale})`, height: viewHeight ? `${viewHeight * viewScale}px` : undefined }}
+            style={{
+              transform: `scale(${viewScale})`,
+              transformOrigin: 'top left',
+              position: 'relative',
+              left: `${Math.max(0, (viewWidth - 780 * viewScale) / 2)}px`,
+              height: viewHeight ? `${viewHeight * viewScale}px` : undefined
+            }}
           >
             <div className="certificate-body" id="printable-certificate">
               <div className="certificate-page">

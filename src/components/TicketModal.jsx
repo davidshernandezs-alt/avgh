@@ -10,6 +10,10 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
   const title = localize(act?.titulo, lang)
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`AVGH|${user?.uid}|${act?.id || insc?.actividadId}`)}`
 
+  const isPaid =
+    ['completada', 'aprobada'].includes(factura?.estado) ||
+    (Number(insc?.monto || factura?.monto) === 0 && insc?.estado === 'confirmada')
+
   const handlePrint = () => {
     document.body.classList.add('printing-ticket')
     window.print()
@@ -33,8 +37,8 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
             <p>Asociación Venezolana de Gestión Humana</p>
           </div>
 
-          <div className="ticket-status is-paid">
-            <FaCircleCheck /> <span>PAGADO Y CONFIRMADO</span>
+          <div className={`ticket-status ${isPaid ? 'is-paid' : 'is-pending'}`}>
+            <FaCircleCheck /> <span>{isPaid ? 'PAGADO Y CONFIRMADO' : 'INSCRITO - PENDIENTE DE PAGO'}</span>
           </div>
 
           <div className="ticket-info">

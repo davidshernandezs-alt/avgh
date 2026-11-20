@@ -7,6 +7,7 @@ export default defineConfig({
   build: {
     outDir: 'dist-singlefile',
     assetsDir: '',
-    sourcemap: false
+    sourcemap: false,
+    assetsInlineLimit: 2000000
   }
 })

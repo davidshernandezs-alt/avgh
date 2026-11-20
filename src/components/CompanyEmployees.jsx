@@ -381,8 +381,16 @@ export default function CompanyEmployees({ companyUid, companyName }) {
 
       {selectedEmp && (
         <TicketModal
-          actividad={{ titulo: { es: `Empleado AVGH - ${companyName || 'Empresa'}` } }}
-          user={{ nombres: selectedEmp.nombres, apellidos: selectedEmp.apellidos, dni: selectedEmp.dni, empresa: companyName }}
+          actividad={{ id: selectedEmp.actividadId, titulo: { es: `Empleado AVGH - ${companyName || 'Empresa'}` } }}
+          user={{
+            uid: `emp_${String(selectedEmp.dni || '').replace(/\D/g, '')}`,
+            nombres: selectedEmp.nombres,
+            apellidos: selectedEmp.apellidos,
+            dni: selectedEmp.dni,
+            empresa: companyName
+          }}
+          insc={{ actividadId: selectedEmp.actividadId, estado: 'confirmada', monto: 0 }}
+          factura={{ estado: 'completada', monto: 0 }}
           onClose={() => setSelectedEmp(null)}
         />
       )}

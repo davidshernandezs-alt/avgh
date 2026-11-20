@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
-import { FaSackDollar, FaFileInvoice, FaTrash } from 'react-icons/fa6'
+import { FaSackDollar, FaFileInvoice, FaTrash, FaCheck } from 'react-icons/fa6'
 import { useLang } from '../i18n'
-import { useAllFacturas, deleteInvoice } from '../data/useData'
+import { useAllFacturas, deleteInvoice, setInscripcionEstado } from '../data/useData'
+import { ref, update } from 'firebase/database'
+import { db, DB_ROOT } from '../firebase'
 import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
 import { CURRENCY } from '../config'
@@ -44,10 +46,11 @@ function startOfWeekOffset(offset) {
 
 function FacturaBadge({ estado }) {
   const { t } = useLang()
+  const pagada = estado === 'completada' || estado === 'aprobada'
   const cls =
-    estado === 'completada' ? 'completada' : estado === 'rechazada' ? 'Rechazada' : 'pendiente'
+    pagada ? 'completada' : estado === 'rechazada' ? 'Rechazada' : 'pendiente'
   const key =
-    estado === 'completada'
+    pagada
       ? 'insc.statusCompletada'
       : estado === 'rechazada'
         ? 'insc.statusRechazada'
@@ -65,6 +68,22 @@ export default function AdminPayments() {
     if (!window.confirm('¿Eliminar esta factura definitivamente?')) return
     try {
       await deleteInvoice(uid, facturaId)
+    } catch {
+      alert(t('admin.errorSave'))
+    }
+  }
+
+  const markPaid = async (r) => {
+    if (!window.confirm('¿Marcar esta factura como pagada y confirmar la inscripción?')) return
+    try {
+      if (r.actividadId) {
+        await setInscripcionEstado({ uid: r.uid, actividadId: r.actividadId, estado: 'confirmada' })
+      } else {
+        await update(ref(db, `${DB_ROOT}/facturas/${r.uid}/${r.facturaId}`), {
+          estado: 'completada',
+          validadaFecha: Date.now()
+        })
+      }
     } catch {
       alert(t('admin.errorSave'))
     }
@@ -242,6 +261,11 @@ export default function AdminPayments() {
                         )}
                       </td>
                       <td>
+                        {r.factura.estado !== 'completada' && (
+                          <button className="btn btn-outline btn-sm" onClick={() => markPaid(r)} title="Marcar pagado">
+                            <FaCheck />
+                          </button>
+                        )}{' '}
                         <button className="btn btn-danger-outline btn-sm" onClick={() => removeInvoice(r.uid, r.facturaId)}>
                           <FaTrash />
                         </button>

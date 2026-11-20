@@ -2860,6 +2860,11 @@ textarea {
   color: var(--success);
 }
 
+.ticket-status.is-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .ticket-info {
   width: 100%;
   background: var(--bg);
@@ -2933,8 +2938,23 @@ textarea {
 .certificate-scaler {
   width: 780px;
   max-width: none;
-  transform-origin: top center;
+  transform-origin: top left;
   margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+  .certificate-modal .ticket-actions {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding: 10px 14px 14px;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 3;
+  }
+  .certificate-modal .ticket-actions .btn {
+    font-size: 12px;
+    padding: 9px 10px;
+  }
 }
 
 .certificate-body {
@@ -2952,14 +2972,14 @@ textarea {
   border: 2px double var(--gold);
   border-radius: var(--radius);
   background-color: #fdf6e3;
-  background-image: url('/certificado-fondo-principal.jpg');
+  background-image: url('../assets/certificado-fondo-principal.jpg');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center 10%;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
   box-shadow: inset 0 0 40px rgba(243, 179, 19, 0.08);
-  padding: 90px 34px 30px;
+  padding: 90px 34px 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2973,7 +2993,7 @@ textarea {
   width: min(780px, 100%);
   aspect-ratio: 4 / 3;
   min-height: 0;
-  background-image: url('/certificado-fondo-anverso.jpg');
+  background-image: url('../assets/certificado-fondo-anverso.jpg');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center 10%;
