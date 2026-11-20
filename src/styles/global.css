@@ -2923,6 +2923,20 @@ textarea {
   overflow-y: auto;
 }
 
+.certificate-viewport {
+  width: 100%;
+  overflow: hidden;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+
+.certificate-scaler {
+  width: 780px;
+  max-width: none;
+  transform-origin: top center;
+  margin: 0 auto;
+}
+
 .certificate-body {
   background: #fff;
   padding: 10px;
@@ -4100,41 +4114,6 @@ textarea {
   .aff-hero {
     padding: 24px 18px;
   }
-}
-
-/* ============ VISTA PREVIA EN CELULAR ============ */
-@media (max-width: 760px) {
-  .certificate-modal {
-    max-height: none;
-  }
-  .certificate-page,
-  .certificate-page-alt {
-    width: 100%;
-    aspect-ratio: auto;
-    min-height: 520px;
-    padding: 50px 14px 24px;
-    background-size: cover;
-    background-position: center;
-    border-width: 1px;
-    gap: 6px;
-  }
-  .certificate-org-strong { font-size: 13px; }
-  .certificate-kicker { font-size: 14px; }
-  .certificate-program { font-size: 10px; }
-  .certificate-program-title { font-size: 14px; padding: 4px 8px; max-width: 100%; }
-  .certificate-otorga { font-size: 10px; }
-  .certificate-recipient { font-size: 18px; min-width: 160px; padding: 4px 10px; }
-  .certificate-meta, .certificate-stack { font-size: 11px; }
-  .certificate-signatures { gap: 8px; flex-wrap: wrap; justify-content: center; padding-top: 8px; }
-  .certificate-signature { min-width: 88px; }
-  .certificate-firma-img { max-height: 40px; }
-  .certificate-signature-noimage { height: 40px; }
-  .certificate-signature-name { font-size: 10px; }
-  .certificate-signature-role { font-size: 8px; letter-spacing: 0; }
-  .certificate-affiliado { min-width: 100px; }
-  .certificate-affiliado-label { font-size: 9px; }
-  .certificate-affiliado-logo { height: 22px; max-width: 44px; }
-  .certificate-objective, .certificate-modules, .certificate-facilitator { font-size: 11px; max-width: 100%; }
 }
 
 @media print {

@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FaXmark, FaPrint, FaEnvelope, FaCircleCheck, FaAward } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { localize } from '../utils/localized'
 import { formatDate } from '../components/ActivityCard'
 import { useAuth } from '../auth/AuthContext'
 import { saveUserCertificate } from '../data/useData'
+import { downloadCertificatePDF } from '../utils/certificatePdf'
 
 const EMPTY_CERT = {
   nombre: '',
@@ -167,10 +168,38 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
       )}`
     : '#'
 
-  const handlePrint = () => {
-    document.body.classList.add('printing-certificate')
-    window.print()
-    window.addEventListener('afterprint', () => document.body.classList.remove('printing-certificate'), { once: true })
+  const [downloading, setDownloading] = useState(false)
+  const viewportRef = useRef(null)
+  const scalerRef = useRef(null)
+  const [viewScale, setViewScale] = useState(1)
+  const [viewHeight, setViewHeight] = useState(0)
+
+  useEffect(() => {
+    const update = () => {
+      const vp = viewportRef.current
+      const sc = scalerRef.current
+      if (!vp || !sc) return
+      const naturalWidth = 780
+      const available = vp.clientWidth || naturalWidth
+      const next = Math.min(1, available / naturalWidth)
+      setViewScale(next)
+      setViewHeight(sc.scrollHeight)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      await downloadCertificatePDF(scalerRef.current, `Certificado-AVGH-${(cert.nombre || 'participante').replace(/\s+/g, '-')}.pdf`)
+    } catch (err) {
+      console.error(err)
+      window.alert('No se pudo generar el PDF. Intenta de nuevo.')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   const modules = (cert.contenido || '')
@@ -286,8 +315,14 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
           </div>
         )}
 
-        <div className="certificate-body" id="printable-certificate">
-          <div className="certificate-page">
+        <div className="certificate-viewport" ref={viewportRef}>
+          <div
+            className="certificate-scaler"
+            ref={scalerRef}
+            style={{ transform: `scale(${viewScale})`, height: viewHeight ? `${viewHeight * viewScale}px` : undefined }}
+          >
+            <div className="certificate-body" id="printable-certificate">
+              <div className="certificate-page">
             <div className="certificate-org-strong">La Asociación Venezolana de Gestión Humana (AVGH)</div>
             <div className="certificate-kicker">Certificado de Participación</div>
             <div className="certificate-program">Por haber participado en el programa de:</div>
@@ -334,6 +369,8 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
             <div className="certificate-program">Facilitador:</div>
             <div className="certificate-facilitator">{cert.facilitador}</div>
           </div>
+            </div>
+          </div>
         </div>
 
         <div className="ticket-actions no-print">
@@ -342,8 +379,8 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
               <FaCircleCheck /> {busy ? 'Guardando...' : savedOk ? 'Certificado guardado ✅' : 'Emitir certificado'}
             </button>
           )}
-          <button className="btn btn-primary btn-block" onClick={handlePrint}>
-            <FaPrint /> Imprimir / Guardar PDF
+          <button className="btn btn-primary btn-block" onClick={handleDownload} disabled={downloading}>
+            <FaPrint /> {downloading ? 'Generando PDF...' : 'Descargar PDF (2 páginas)'}
           </button>
           {isAdmin && user?.email && (
             <a className="btn btn-outline btn-block" href={emailHref}>
