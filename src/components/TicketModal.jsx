@@ -11,7 +11,9 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`AVGH|${user?.uid}|${act?.id || insc?.actividadId}`)}`
 
   const handlePrint = () => {
+    document.body.classList.add('printing-ticket')
     window.print()
+    window.addEventListener('afterprint', () => document.body.classList.remove('printing-ticket'), { once: true })
   }
 
   return (

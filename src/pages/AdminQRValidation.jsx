@@ -31,6 +31,29 @@ export default function AdminQRValidation() {
   const lastScannedCodeRef = useRef(null)
   const validatingRef = useRef(false)
   const scanPausedUntilRef = useRef(0)
+  const audioCtxRef = useRef(null)
+
+  const playSuccessBeep = () => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      if (!Ctx) return
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctx()
+      const ctx = audioCtxRef.current
+      if (ctx.state === 'suspended') ctx.resume()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = 880
+      gain.gain.setValueAtTime(0.12, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.18)
+    } catch {
+      /* el sonido es opcional */
+    }
+  }
 
   useEffect(() => {
     if (bankConfig?.appUrl) {
@@ -130,6 +153,7 @@ export default function AdminQRValidation() {
         fechaAsistencia: Date.now()
       })
       const updatedInsc = { ...insc, presente: true }
+      playSuccessBeep()
 
       // NO detenemos la cámara, el escaneo sigue activo de forma continua y fluida.
       setResult({

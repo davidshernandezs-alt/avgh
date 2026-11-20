@@ -168,7 +168,9 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
     : '#'
 
   const handlePrint = () => {
+    document.body.classList.add('printing-certificate')
     window.print()
+    window.addEventListener('afterprint', () => document.body.classList.remove('printing-certificate'), { once: true })
   }
 
   const modules = (cert.contenido || '')
