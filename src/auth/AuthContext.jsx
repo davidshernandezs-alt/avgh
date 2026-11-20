@@ -76,14 +76,12 @@ export function AuthProvider({ children }) {
   // facturas y certificados a ese uid para que el perfil vea todo.
   const migrateLegacyData = async ({ toUid, dni, fromUids = [] }) => {
     try {
-      const [insSnap, facSnap, certSnap] = await Promise.all([
+      const [insSnap, facSnap] = await Promise.all([
         get(ref(db, `${DB_ROOT}/inscripciones`)),
-        get(ref(db, `${DB_ROOT}/facturas`)),
-        get(ref(db, `${DB_ROOT}/certificados`))
+        get(ref(db, `${DB_ROOT}/facturas`))
       ])
       const ins = insSnap.val() || {}
       const fac = facSnap.val() || {}
-      const cert = certSnap.val() || {}
       const sources = new Set(fromUids.filter(Boolean))
       const digits = (dni || '').replace(/\D/g, '')
       for (const [uid, acts] of Object.entries(ins)) {
@@ -95,7 +93,7 @@ export function AuthProvider({ children }) {
       const updates = {}
       for (const from of sources) {
         if (!from || from === toUid) continue
-        for (const [node, store] of [['inscripciones', ins], ['facturas', fac], ['certificados', cert]]) {
+        for (const [node, store] of [['inscripciones', ins], ['facturas', fac]]) {
           const dataNode = store[from]
           if (!dataNode) continue
           for (const [key, value] of Object.entries(dataNode)) {

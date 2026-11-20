@@ -758,9 +758,29 @@ export async function saveUserCertificate({ uid, actividadId, data }) {
   if (!cleanUid || !cleanActividadId) {
     throw new Error('Faltan uid o actividadId para emitir el certificado')
   }
-  await update(ref(db, '/'), {
+  // Si el admin emite desde una fila con uid sintético (emp_...), guardamos
+  // también una copia bajo el uid real de Auth para que el usuario lo vea.
+  let canonicalUid = cleanUid
+  try {
+    const dniDigits = String(data?.dni || '').replace(/\D/g, '')
+    const snap = await get(ref(db, `${DB_ROOT}/users`))
+    const users = snap.val() || {}
+    for (const [uId, u] of Object.entries(users)) {
+      if (u?.uidOrigen === cleanUid || (dniDigits && String(u?.dni || '').replace(/\D/g, '') === dniDigits)) {
+        canonicalUid = uId
+        break
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  const updates = {
     [`${DB_ROOT}/certificados/${cleanUid}/${cleanActividadId}`]: payload
-  })
+  }
+  if (canonicalUid && canonicalUid !== cleanUid) {
+    updates[`${DB_ROOT}/certificados/${canonicalUid}/${cleanActividadId}`] = payload
+  }
+  await update(ref(db, '/'), updates)
   return payload
 }
 
