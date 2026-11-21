@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { FaXmark, FaPrint, FaEnvelope, FaCircleCheck, FaAward } from 'react-icons/fa6'
+import { FaXmark, FaPrint, FaEnvelope, FaCircleCheck, FaAward, FaTrash } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { localize } from '../utils/localized'
 import { formatDate } from '../components/ActivityCard'
 import { useAuth } from '../auth/AuthContext'
-import { saveUserCertificate } from '../data/useData'
+import { saveUserCertificate, deleteUserCertificate } from '../data/useData'
 import { downloadCertificatePDF } from '../utils/certificatePdf'
 import firma1Url from '../assets/firma-nombre-1.png'
 import firma2Url from '../assets/firma-nombre-2.png'
@@ -208,6 +208,26 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
     }
   }
 
+  const [deleting, setDeleting] = useState(false)
+  const [deletedOk, setDeletedOk] = useState(false)
+
+  const handleDelete = async () => {
+    if (!window.confirm(`¿Quitar el certificado emitido a ${cert.nombre || 'este participante'}? Se eliminará de su perfil.`)) return
+    setDeleting(true)
+    try {
+      const uidFinal = user?.uid || user?.id || insc?.uid || ''
+      const actividadIdFinal = insc?.actividadId || act?.id || ''
+      await deleteUserCertificate(uidFinal, actividadIdFinal)
+      setDeletedOk(true)
+      setSavedOk(false)
+    } catch (err) {
+      console.error(err)
+      window.alert('No se pudo quitar el certificado. Intenta de nuevo.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const modules = (cert.contenido || '')
     .split('\n')
     .map((line) => line.trim())
@@ -273,11 +293,6 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
               <span>Facilitador</span>
               <textarea className="input textarea" rows={3} value={cert.facilitador} onChange={(e) => set('facilitador', e.target.value)} />
             </label>
-            <SignatureUpload
-              label="Firma digital del facilitador (imagen PNG/JPG)"
-              value={cert.facilitadorImagen}
-              onChange={(f) => handleFirmaImage(f, 'facilitadorImagen')}
-            />
             <div className="field-row">
               <label className="field-label">
                 <span>Firma 1 - Nombre</span>
@@ -350,7 +365,6 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
             <div className="certificate-signatures">
               <SignatureBlock name={cert.firma1Nombre} role={cert.firma1Cargo} image={cert.firma1Imagen} />
               <SignatureBlock name={cert.firma2Nombre} role={cert.firma2Cargo} image={cert.firma2Imagen} />
-              <SignatureBlock name={facilitatorLines[0] || ''} role="Facilitador" image={cert.facilitadorImagen} />
               <div className="certificate-affiliado">
                 <div className="certificate-affiliado-label">Afiliado a:</div>
                 <div className="certificate-affiliado-logos">
@@ -397,6 +411,11 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
             <a className="btn btn-outline btn-block" href={emailHref}>
               <FaEnvelope /> Enviar certificado por correo
             </a>
+          )}
+          {isAdmin && (
+            <button type="button" className="btn btn-danger-outline btn-block" onClick={handleDelete} disabled={deleting}>
+              <FaTrash /> {deleting ? 'Quitando...' : deletedOk ? 'Certificado quitado ✅' : 'Quitar certificado emitido'}
+            </button>
           )}
         </div>
       </div>

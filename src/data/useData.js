@@ -808,9 +808,22 @@ export async function saveUserCertificate({ uid, actividadId, data }) {
 }
 
 export async function deleteUserCertificate(uid, actividadId) {
-  await update(ref(db, '/'), {
+  const updates = {
     [`${DB_ROOT}/certificados/${uid}/${actividadId}`]: null
-  })
+  }
+  // Si el certificado se guardó también bajo el uid real de Auth, borramos esa copia.
+  try {
+    const snap = await get(ref(db, `${DB_ROOT}/users`))
+    const users = snap.val() || {}
+    for (const [uId, u] of Object.entries(users)) {
+      if (u?.uidOrigen === uid || (uId !== uid && `${u?.dni || ''}`.replace(/\D/g, '') && `${u?.dni || ''}`.replace(/\D/g, '') === `${(uid.match(/\d+/) || [''])[0]}`)) {
+        updates[`${DB_ROOT}/certificados/${uId}/${actividadId}`] = null
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  await update(ref(db, '/'), updates)
 }
 
 export async function saveActividad(id, data) {

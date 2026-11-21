@@ -3022,6 +3022,45 @@ textarea {
   background-position: center 10%;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+  border: 2px double var(--gold);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 5px;
+  padding: 30px 40px 24px;
+  box-sizing: border-box;
+}
+
+.certificate-page-alt .certificate-kicker {
+  margin-bottom: 2px;
+}
+
+.certificate-page-alt .certificate-program,
+.certificate-page-alt .certificate-program-title,
+.certificate-page-alt .certificate-objective,
+.certificate-page-alt .certificate-modules,
+.certificate-page-alt .certificate-facilitator {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.certificate-page-alt .certificate-objective {
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.certificate-page-alt .certificate-modules {
+  font-size: 11px;
+  line-height: 1.3;
+  gap: 2px;
+}
+
+.certificate-page-alt .certificate-facilitator {
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .certificate-stack {
@@ -3117,8 +3156,8 @@ textarea {
 
 .certificate-signatures {
   display: flex;
-  gap: 24px;
-  justify-content: flex-start;
+  gap: 28px;
+  justify-content: center;
   align-items: flex-end;
   margin-top: auto;
   padding-top: 8px;
@@ -3129,7 +3168,8 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-width: 160px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .certificate-signature-line {
@@ -3183,7 +3223,8 @@ textarea {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  min-width: 150px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .certificate-affiliado-label {

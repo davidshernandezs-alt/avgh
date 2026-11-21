@@ -67,8 +67,14 @@ export default function InscriptionPage() {
       <div className="page">
         <div className="success-card">
           <div className="success-icon"><FaCircleCheck /></div>
-          <h2>{t('insc.success')}</h2>
-          <p>{t('insc.successHint')}</p>
+          <h2>¡Tu inscripción está confirmada!</h2>
+          <p>
+            Nos complace darte la bienvenida a nuestra <strong>{title || 'actividad AVGH'}</strong>.
+            <br />
+            Estamos preparados para recibirte y compartir una experiencia enriquecedora, llena de
+            conocimientos, tendencias y oportunidades para conectar con destacados profesionales y
+            líderes empresariales.
+          </p>
           <div className="success-invoice">
             <span>{t('insc.invoiceNumber')}</span>
             <strong>{done.numeroFactura}</strong>
