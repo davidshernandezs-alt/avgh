@@ -336,12 +336,11 @@ export default function CertificateModal({ user, insc, act, mode = 'admin', save
             <div className="certificate-body" id="printable-certificate">
               <div className="certificate-page">
             <div className="certificate-org-strong">La Asociación Venezolana de Gestión Humana (AVGH)</div>
-            <div className="certificate-kicker">Certificado de Participación</div>
-            <div className="certificate-program">Por haber participado en el programa de:</div>
-            <div className="certificate-program-title">{cert.titulo}</div>
-            <div className="certificate-otorga">La Asociación Venezolana de Gestión Humana (AVGH) Otorga el presente certificado a:</div>
+            <div className="certificate-otorga">Otorga el presente certificado a:</div>
             <div className="certificate-recipient">{cert.nombre}</div>
             {cert.cedula && <div className="certificate-meta">Cédula: {cert.cedula}</div>}
+            <div className="certificate-program">Por haber participado en el programa de:</div>
+            <div className="certificate-program-title">{cert.titulo}</div>
             <div className="certificate-stack">
               <div>{cert.fecha ? `Caracas, ${fmtFechaCert(cert.fecha)}` : '____'}</div>
               <div><strong>Duración:</strong> {cert.duracion || '____'}</div>

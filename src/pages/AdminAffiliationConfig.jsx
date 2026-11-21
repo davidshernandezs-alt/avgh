@@ -26,6 +26,7 @@ function serializePlan(plan) {
   return {
     ...plan,
     precioMonto: Number(plan.precioMonto) || 0,
+    descuentoEventos: Math.max(0, Math.min(100, Number(plan.descuentoEventos) || 0)),
     beneficios: toLines(plan.beneficios),
     requisitos: toLines(plan.requisitos)
   }
@@ -86,6 +87,13 @@ export default function AdminAffiliationConfig() {
           <FaCircleInfo />
           <span>
             Escribe un beneficio o requisito por línea. Los cambios se publican al guardar.
+          </span>
+        </div>
+
+        <div className="admin-aff-note admin-aff-note-important">
+          <FaCircleInfo />
+          <span>
+            Importante: si el admin cambia el % después, solo afecta inscripciones nuevas; las facturas ya emitidas conservan su monto (no se recalculan).
           </span>
         </div>
 
@@ -190,6 +198,24 @@ export default function AdminAffiliationConfig() {
                   <em>
                     Este monto se usa en la factura y en los totales de Facturación / Pagos. Usa 0 si el
                     plan es cotización a medida.
+                  </em>
+                </label>
+
+                <label className="field-label">
+                  <span>Descuento en eventos, cursos y talleres (%)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    className="input"
+                    value={plan.descuentoEventos ?? 0}
+                    onChange={(e) => updatePlan(planKey, 'descuentoEventos', e.target.value)}
+                    placeholder="Ej. 10"
+                  />
+                  <em>
+                    Se aplica al inscribirse a actividades AVGH si el participante está afiliado a este plan.
+                    Quien no esté afiliado paga el precio regular.
                   </em>
                 </label>
 

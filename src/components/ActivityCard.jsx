@@ -2,6 +2,9 @@ import { Link } from 'react-router-dom'
 import { FaCalendarDay, FaClock } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { CURRENCY } from '../config'
+import { useAuth } from '../auth/AuthContext'
+import { useAffiliationConfig } from '../data/useData'
+import { calcularPrecioInscripcion } from '../data/pricing'
 
 export function formatDate(ts, lang) {
   if (!ts) return ''
@@ -14,6 +17,9 @@ export function formatDate(ts, lang) {
 
 export default function ActivityCard({ item }) {
   const { lang, t } = useLang()
+  const { profile } = useAuth()
+  const { config: affConfig } = useAffiliationConfig()
+  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig })
   const title = item.titulo && typeof item.titulo === 'object' ? item.titulo[lang] : item.titulo
   const desc =
     item.descripcion && typeof item.descripcion === 'object'
@@ -51,6 +57,11 @@ export default function ActivityCard({ item }) {
           </span>
           <span className="activity-cta">→</span>
         </div>
+        {pricing.descuentoPorcentaje > 0 && (item.precio ?? 0) > 0 && (
+          <div className="activity-affiliate-price">
+            {t('insc.affiliatePrice')}: {CURRENCY}{pricing.montoUnitario} · {t('insc.youSave')} {pricing.descuentoPorcentaje}%
+          </div>
+        )}
       </div>
     </Link>
   )

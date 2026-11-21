@@ -5,7 +5,8 @@ import { ref, onValue, set } from 'firebase/database'
 import { db, DB_ROOT } from '../firebase'
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
-import { useActivity, createInscription, useBankConfig, uploadComprobante, useMyInscriptions } from '../data/useData'
+import { useActivity, createInscription, useBankConfig, uploadComprobante, useMyInscriptions, useAffiliationConfig } from '../data/useData'
+import { calcularPrecioInscripcion } from '../data/pricing'
 import { fileToStorable } from '../utils/files'
 import { CURRENCY } from '../config'
 
@@ -15,6 +16,7 @@ export default function InscriptionPage() {
   const { user, profile } = useAuth()
   const { item, loading } = useActivity(id)
   const { config: bank } = useBankConfig()
+  const { config: affConfig } = useAffiliationConfig()
   const { items: myInscriptions } = useMyInscriptions(user?.uid)
   const [metodoPago, setMetodoPago] = useState('transfer')
   const [comprobanteFile, setComprobanteFile] = useState(null)
@@ -73,7 +75,7 @@ export default function InscriptionPage() {
           </div>
           <div className="success-total">
             <span>{t('insc.total')}</span>
-            <strong>{(item.precio ?? 0) > 0 ? `${CURRENCY}${item.precio}` : t('detail.free')}</strong>
+            <strong>{done.monto > 0 ? `${CURRENCY}${done.monto}` : t('detail.free')}</strong>
           </div>
           <Link to="/perfil" className="btn btn-primary btn-block">{t('insc.seeProfile')}</Link>
           <Link to="/" className="link-muted">{t('insc.goHome')}</Link>
@@ -93,12 +95,25 @@ export default function InscriptionPage() {
     )
   }
 
-  const precioNum = Number(item.precio) || 0
-  const isFree = precioNum <= 0
-
   const isCompany = profile?.tipoPersona === 'juridico'
   const countParticipants = isCompany && selectedEmployees.length > 0 ? selectedEmployees.length : 1
-  const totalMonto = isFree ? 0 : precioNum * countParticipants
+  const pricing = calcularPrecioInscripcion({
+    precio: item?.precio,
+    profile,
+    config: affConfig,
+    countParticipants
+  })
+  const {
+    precioBase,
+    descuentoPorcentaje,
+    descuentoUnitario,
+    descuentoMonto,
+    montoUnitario,
+    montoFinal: totalMonto,
+    planAfiliacion
+  } = pricing
+  const isFree = precioBase <= 0 || totalMonto <= 0
+  const precioNum = precioBase
 
   const toggleSelectEmp = (empId) => {
     setSelectedEmployees((prev) =>
@@ -149,7 +164,19 @@ export default function InscriptionPage() {
                 empresa: profile?.nombreEmpresa || ''
               },
               metodoPago: isFree ? 'gratis' : metodoPago,
-              estado: 'pendiente'
+              estado: 'pendiente',
+              monto: isFree ? 0 : montoUnitario,
+              afiliado: pricing.afiliado,
+              planAfiliacion,
+              desglose: {
+                precioBase,
+                descuentoPorcentaje,
+                descuentoMonto: descuentoUnitario,
+                montoUnitario: isFree ? 0 : montoUnitario,
+                afiliado: pricing.afiliado,
+                planAfiliacion,
+                countParticipants: 1
+              }
             })
             // Actualizar la última actividad asociada al empleado en la DB
             await set(ref(db, `${DB_ROOT}/companies/${user.uid}/employees/${empId}/actividadId`), item.id)
@@ -173,8 +200,20 @@ export default function InscriptionPage() {
             dni: profile?.dni || user.email || '',
             email: profile?.email || user.email || '',
             telefono: profile?.telefono || ''
-          }, 
-          metodoPago: isFree ? 'gratis' : metodoPago 
+          },
+          metodoPago: isFree ? 'gratis' : metodoPago,
+          monto: isFree ? 0 : montoUnitario,
+          afiliado: pricing.afiliado,
+          planAfiliacion,
+          desglose: {
+            precioBase,
+            descuentoPorcentaje,
+            descuentoMonto: descuentoUnitario,
+            montoUnitario: isFree ? 0 : montoUnitario,
+            afiliado: pricing.afiliado,
+            planAfiliacion,
+            countParticipants: 1
+          }
         })
         setDone(result)
       }
@@ -279,6 +318,11 @@ export default function InscriptionPage() {
           <span>{t('insc.total')} {countParticipants > 1 ? `(${countParticipants} participantes)` : ''}</span>
           <strong>{!isFree ? `${CURRENCY}${totalMonto}` : t('detail.free')}</strong>
         </div>
+        {descuentoPorcentaje > 0 && !isFree && (
+          <div className="discount-note">
+            {t('insc.regularPrice')}: {CURRENCY}{precioBase * countParticipants} · {t('insc.discountApplied')} {descuentoPorcentaje}% ({planAfiliacion === 'corporativo' ? t('aff.corporativo') : t('aff.individual')}) · {t('insc.youSave')} {CURRENCY}{descuentoMonto}
+          </div>
+        )}
 
         {!isFree && (
           <>

@@ -161,24 +161,38 @@ export function useMyFacturas(uid) {
   return { items, loading, error }
 }
 
-export async function createInscription({ uid, actividad, user, metodoPago, estado = 'pendiente', tipoAsistente = 'regular' }) {
+export async function createInscription({
+  uid,
+  actividad,
+  user,
+  metodoPago,
+  estado = 'pendiente',
+  tipoAsistente = 'regular',
+  monto,
+  desglose = null,
+  afiliado = null,
+  planAfiliacion = ''
+}) {
   if (!uid) throw new Error('UID de usuario ausente')
   if (!actividad?.id) throw new Error('ID de actividad ausente')
 
   const facturaId = 'FAC_' + Math.random().toString(36).substring(2, 9)
   const numeroFactura = `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
   const fecha = Date.now()
-  const monto = Number(actividad.precio) || 0
+  const montoFinal = monto !== undefined && monto !== null ? Number(monto) || 0 : Number(actividad.precio) || 0
 
   const inscripcion = {
     fecha,
     estado,
     tipoAsistente,
     metodoPago,
-    monto,
+    monto: montoFinal,
     facturaId,
     presente: false,
-    user: user && typeof user === 'object' ? user : {}
+    user: user && typeof user === 'object' ? user : {},
+    ...(afiliado !== null ? { afiliado } : {}),
+    ...(planAfiliacion ? { planAfiliacion } : {}),
+    ...(desglose ? { desglose } : {})
   }
 
   const tituloAct = actividad.titulo
@@ -190,11 +204,20 @@ export async function createInscription({ uid, actividad, user, metodoPago, esta
     numero: numeroFactura,
     actividadId: actividad.id,
     concepto,
-    monto,
+    monto: montoFinal,
     fecha,
     metodo: metodoPago,
     estado: estado === 'confirmada' ? 'completada' : 'pendiente',
-    validadaFecha: estado === 'confirmada' ? fecha : null
+    validadaFecha: estado === 'confirmada' ? fecha : null,
+    ...(desglose
+      ? {
+          precioBase: desglose.precioBase,
+          descuentoPorcentaje: desglose.descuentoPorcentaje,
+          descuentoMonto: desglose.descuentoMonto
+        }
+      : {}),
+    ...(afiliado !== null ? { afiliado } : {}),
+    ...(planAfiliacion ? { planAfiliacion } : {})
   }
 
   const updates = {}
@@ -203,7 +226,7 @@ export async function createInscription({ uid, actividad, user, metodoPago, esta
 
   await update(ref(db), updates)
 
-  return { facturaId, numeroFactura }
+  return { facturaId, numeroFactura, monto: montoFinal, desglose }
 }
 
 export async function fetchActividad(id) {

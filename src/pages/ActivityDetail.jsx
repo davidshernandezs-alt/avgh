@@ -1,8 +1,9 @@
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { FaArrowLeft, FaCalendarDay, FaClock, FaUserGraduate, FaUsers, FaSackDollar, FaBullseye, FaListUl, FaChalkboardUser } from 'react-icons/fa6'
+import { FaArrowLeft, FaCalendarDay, FaClock, FaUserGraduate, FaUsers, FaSackDollar, FaBullseye, FaListUl, FaChalkboardUser, FaUserCheck } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
-import { useActivity } from '../data/useData'
+import { useActivity, useAffiliationConfig } from '../data/useData'
+import { calcularPrecioInscripcion } from '../data/pricing'
 import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
 import { CURRENCY } from '../config'
@@ -10,8 +11,10 @@ import { CURRENCY } from '../config'
 export default function ActivityDetail() {
   const { tipo, id } = useParams()
   const { lang, t } = useLang()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { item, loading } = useActivity(id)
+  const { config: affConfig } = useAffiliationConfig()
+  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig })
   const navigate = useNavigate()
 
   if (loading) return <div className="page"><div className="loading">{t('cat.loading')}</div></div>
@@ -110,6 +113,11 @@ export default function ActivityDetail() {
               <FaSackDollar /> <strong>{t('detail.price')}:</strong>{' '}
               {(item.precio ?? 0) > 0 ? `${CURRENCY}${item.precio}` : t('detail.free')}
             </li>
+            {pricing.descuentoPorcentaje > 0 && (item.precio ?? 0) > 0 && (
+              <li className="detail-affiliate-price">
+                <FaUserCheck /> <strong>{t('insc.affiliatePrice')}:</strong> {CURRENCY}{pricing.montoUnitario} · {t('insc.youSave')} {pricing.descuentoPorcentaje}%
+              </li>
+            )}
           </ul>
 
           {objetivo && (

@@ -725,6 +725,17 @@ textarea {
   color: var(--gold);
 }
 
+.discount-note {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
 .checkbox {
   display: flex;
   gap: 10px;
@@ -1057,6 +1068,18 @@ textarea {
   font-weight: 800;
   color: var(--red);
   font-size: 16px;
+}
+
+.activity-affiliate-price {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.detail-affiliate-price {
+  color: #065f46;
+  font-weight: 600;
 }
 
 .activity-cta {
@@ -2979,7 +3002,7 @@ textarea {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
   box-shadow: inset 0 0 40px rgba(243, 179, 19, 0.08);
-  padding: 90px 34px 64px;
+  padding: 90px 34px 86px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3997,6 +4020,17 @@ textarea {
   flex: 0 0 auto;
   margin-top: 2px;
   color: var(--blue);
+}
+
+.admin-aff-note-important {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+  font-weight: 600;
+}
+
+.admin-aff-note-important svg {
+  color: #ea580c;
 }
 
 @media (min-width: 900px) {

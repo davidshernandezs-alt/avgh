@@ -12,6 +12,7 @@ export const AFFILIATION_DEFAULTS = {
       'Para profesionales que desean fortalecer su carrera y acceder a contenido especializado.',
     precio: '$30,00 + IVA',
     precioMonto: 30,
+    descuentoEventos: 10,
     precioEtiqueta: 'Inversión trimestral',
     precioNota: 'Al cambio oficial del día',
     beneficios: [
@@ -39,6 +40,7 @@ export const AFFILIATION_DEFAULTS = {
       'Para organizaciones que apuestan por el desarrollo de su talento humano y su visibilidad.',
     precio: 'Cotización a medida',
     precioMonto: 0,
+    descuentoEventos: 25,
     precioEtiqueta: 'Inversión anual',
     precioNota: 'Según el tamaño de la empresa',
     beneficios: [

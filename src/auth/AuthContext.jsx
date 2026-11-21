@@ -102,6 +102,35 @@ export function AuthProvider({ children }) {
           }
         }
       }
+      // Los empleados de una empresa son afiliados corporativos: aseguramos
+      // que su perfil quede marcado aunque la cuenta ya existiera.
+      if (digits) {
+        try {
+          const compSnap = await get(ref(db, `${DB_ROOT}/companies`))
+          const companies = compSnap.val() || {}
+          let empresa = ''
+          for (const comp of Object.values(companies)) {
+            const match = Object.values(comp?.employees || {}).find(
+              (emp) => String(emp?.dni || '').replace(/\D/g, '') === digits
+            )
+            if (match) {
+              empresa = comp?.nombreEmpresa || emp?.empresa || ''
+              break
+            }
+          }
+          if (empresa || Object.values(companies).some((comp) =>
+            Object.values(comp?.employees || {}).some((emp) => String(emp?.dni || '').replace(/\D/g, '') === digits)
+          )) {
+            updates[`${DB_ROOT}/users/${toUid}/afiliado`] = true
+            updates[`${DB_ROOT}/users/${toUid}/tipoAfiliacion`] = 'corporativo'
+            updates[`${DB_ROOT}/users/${toUid}/planAfiliacion`] = 'corporativo'
+            if (empresa) updates[`${DB_ROOT}/users/${toUid}/empresa`] = empresa
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
       if (Object.keys(updates).length) await update(ref(db, '/'), updates)
     } catch (e) {
       console.warn('No se pudieron migrar datos anteriores:', e)
