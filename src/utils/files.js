@@ -31,6 +31,7 @@ function loadImage(src) {
   })
 }
 
+// Recorte CUADRADO para las tarjetas (1:1). Resultado: targetSize x targetSize.
 export async function imageSquareCropToDataUrl(file, targetSize = 500) {
   const dataUrl = await readAsDataUrl(file)
   const img = await loadImage(dataUrl)
@@ -49,9 +50,28 @@ export async function imageSquareCropToDataUrl(file, targetSize = 500) {
   return canvas.toDataURL('image/jpeg', 0.88)
 }
 
+// REDIMENSIONA sin recortar (respeta la proporción). Para el banner panorámico.
+// maxWidth x maxHeight definen el recuadro máximo; la imagen se escala para caber.
+export async function imageFitToDataUrl(file, maxWidth = 1200, maxHeight = 675) {
+  const dataUrl = await readAsDataUrl(file)
+  const img = await loadImage(dataUrl)
+
+  const ratio = Math.min(maxWidth / img.width, maxHeight / img.height, 1)
+  const w = Math.round(img.width * ratio)
+  const h = Math.round(img.height * ratio)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0, w, h)
+
+  return canvas.toDataURL('image/jpeg', 0.88)
+}
+
 // Convierte un archivo a data URL para guardarlo en Realtime Database.
 // Imágenes -> se redimensionan. PDF -> se acepta tal cual (hasta 4 MB).
-export async function fileToStorable(file, maxDim) {
+export async function fileToStorable(file, maxDim, mode = 'square') {
   if (!file) throw new Error('no-file')
   if (file.size > MAX_FILE_BYTES) throw new Error('too-large')
 
@@ -59,7 +79,10 @@ export async function fileToStorable(file, maxDim) {
     return { dataUrl: await readAsDataUrl(file), type: file.type, name: file.name }
   }
   if (file.type === 'image/jpeg' || file.type === 'image/png') {
-    const dataUrl = await imageSquareCropToDataUrl(file, 500)
+    const dataUrl =
+      mode === 'banner'
+        ? await imageFitToDataUrl(file, 1200, 675)
+        : await imageSquareCropToDataUrl(file, 500)
     return { dataUrl, type: 'image/jpeg', name: file.name }
   }
   throw new Error('bad-type')

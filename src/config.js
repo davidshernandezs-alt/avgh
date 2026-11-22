@@ -5,6 +5,11 @@ export const SITE_NAME = 'AVGH'
 
 export const CURRENCY = '$'
 
+// Encuesta de satisfacción (Google Forms). Se muestra a inscritos que
+// asistieron; al responderla se habilita la descarga del certificado emitido.
+export const SURVEY_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLSdDlPglexaiWiB1aqUiKAwtsWFHQFxIl_fgYQXQ7dfQtf2sKg/viewform?pli=1'
+
 // Correo de la cuenta de administración (se crea con scripts/create-admin.mjs).
 // Solo el perfil cuyo rol sea "admin" puede entrar al panel de administración.
 export const ADMIN_EMAIL = 'informacion@avgh.org.ve'

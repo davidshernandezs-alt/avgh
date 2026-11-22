@@ -17,6 +17,7 @@ import {
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
 import { useMyInscriptions, useMyFacturas, useActivities, useUserCertificates, uploadComprobante } from '../data/useData'
+import SurveyModal from '../components/SurveyModal'
 import { formatDate } from '../components/ActivityCard'
 import { CURRENCY } from '../config'
 import { fileToStorable } from '../utils/files'
@@ -123,6 +124,17 @@ export default function Profile() {
   const [passForm, setPassForm] = useState({ current: '', next: '', confirm: '' })
   const [passMsg, setPassMsg] = useState('')
   const [passBusy, setPassBusy] = useState(false)
+  const [surveyBusy, setSurveyBusy] = useState(null)
+  const [showSurvey, setShowSurvey] = useState(null)
+
+  const surveyDone = (actividadId) =>
+    !!inscripciones.find((i) => i.actividadId === actividadId)?.encuestaCompletada
+
+  const handleSurveyDone = (actividadId) => setShowSurvey(actividadId)
+
+  // Certificados: solo se muestran si el admin los emitió Y el usuario ya
+  // respondió la encuesta de satisfacción de esa actividad.
+  const certificadosVisibles = certificates.filter((c) => surveyDone(c.actividadId))
 
   const removePhoto = async () => {
     setBusy(true)
@@ -579,6 +591,43 @@ export default function Profile() {
         )}
       </section>
 
+      {/* Encuesta de satisfacción */}
+      {(() => {
+        const pendientes = inscripciones.filter(
+          (i) => i.presente === true && !i.encuestaCompletada
+        )
+        if (pendientes.length === 0) return null
+        return (
+          <section className="panel">
+            <div className="panel-head">
+              <FaAward />
+              <h3>Encuesta de satisfacción</h3>
+            </div>
+            <p className="auth-hint">
+              Comparte tu experiencia. Al responder la encuesta podrás ver y descargar el certificado de la actividad.
+            </p>
+            <ul className="list">
+              {pendientes.map((ins) => (
+                <li key={ins.actividadId} className="list-item flex-wrap">
+                  <div className="list-main">
+                    <strong>{actTitle(ins.actividadId) || ins.actividadId}</strong>
+                    <span className="list-sub">Participaste el {formatDate(ins.fechaAsistencia || ins.fecha, lang)}</span>
+                  </div>
+                  <div className="profile-insc-actions">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleSurveyDone(ins.actividadId)}
+                    >
+                      Responder encuesta
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      })()}
+
       {/* Certificados emitidos */}
       <section className="panel">
         <div className="panel-head">
@@ -587,13 +636,15 @@ export default function Profile() {
         </div>
         {loadingCerts ? (
           <div className="loading">{t('cat.loading')}</div>
-        ) : certificates.length === 0 ? (
+        ) : certificadosVisibles.length === 0 ? (
           <div className="panel-empty">
-            <p>{t('profile.certificatesEmpty')}</p>
+            <p>{certificates.length === 0
+              ? t('profile.certificatesEmpty')
+              : 'Responde la encuesta de satisfacción de la actividad para poder ver y descargar tu certificado.'}</p>
           </div>
         ) : (
           <ul className="list">
-            {certificates.map((cert) => (
+            {certificadosVisibles.map((cert) => (
               <li key={cert.actividadId} className="list-item invoice-item">
                 <div className="list-main">
                   <strong className="invoice-num">
@@ -678,6 +729,20 @@ export default function Profile() {
           mode="view"
           saved={certificates.find((c) => c.actividadId === showCert)}
           onClose={() => setShowCert(null)}
+        />
+      )}
+
+      {showSurvey && (
+        <SurveyModal
+          user={user}
+          profile={profile}
+          insc={{ actividadId: showSurvey }}
+          act={actividades.find((a) => a.id === showSurvey)}
+          onClose={() => setShowSurvey(null)}
+          onDone={() => {
+            setShowSurvey(null)
+            setSaved(true)
+          }}
         />
       )}
     </div>

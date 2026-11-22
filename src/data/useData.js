@@ -807,6 +807,79 @@ export async function saveUserCertificate({ uid, actividadId, data }) {
   return payload
 }
 
+export async function submitSurvey({ uid, actividadId, actividadTitulo, respuestas, comentarios, user }) {
+  if (!uid || !actividadId) throw new Error('Faltan datos de la encuesta')
+  const fecha = Date.now()
+  const updates = {
+    [`${DB_ROOT}/encuestas/${actividadId}/${uid}`]: {
+      uid,
+      actividadId,
+      actividadTitulo: actividadTitulo || '',
+      user: {
+        nombres: user?.nombres || '',
+        apellidos: user?.apellidos || '',
+        email: user?.email || '',
+        dni: user?.dni || ''
+      },
+      respuestas,
+      comentarios,
+      fecha
+    },
+    [`${DB_ROOT}/inscripciones/${uid}/${actividadId}/encuestaCompletada`]: true,
+    [`${DB_ROOT}/inscripciones/${uid}/${actividadId}/encuestaFecha`]: fecha
+  }
+  await update(ref(db, '/'), updates)
+}
+
+// Todas las respuestas de encuestas (para métricas del admin).
+export function useSurveyResponses() {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    const r = ref(db, `${DB_ROOT}/encuestas`)
+    let active = true
+    const h = onValue(
+      r,
+      (snap) => {
+        if (!active) return
+        const val = snap.val() || {}
+        const list = []
+        Object.entries(val).forEach(([actividadId, byUid]) => {
+          Object.entries(byUid || {}).forEach(([uid, data]) => {
+            list.push({ actividadId, uid, ...data })
+          })
+        })
+        list.sort((a, b) => (b.fecha || 0) - (a.fecha || 0))
+        setRows(list)
+        setLoading(false)
+        setError(false)
+      },
+      () => {
+        if (active) {
+          setLoading(false)
+          setError(true)
+        }
+      }
+    )
+    return () => {
+      active = false
+      off(r, 'value', h)
+    }
+  }, [])
+
+  return { rows, loading, error }
+}
+
+export async function markSurveyCompleted(uid, actividadId) {
+  if (!uid || !actividadId) throw new Error('Faltan datos de la encuesta')
+  await update(ref(db, `${DB_ROOT}/inscripciones/${uid}/${actividadId}`), {
+    encuestaCompletada: true,
+    encuestaFecha: Date.now()
+  })
+}
+
 export async function deleteUserCertificate(uid, actividadId) {
   const updates = {
     [`${DB_ROOT}/certificados/${uid}/${actividadId}`]: null

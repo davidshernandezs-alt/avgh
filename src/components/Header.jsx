@@ -77,9 +77,9 @@ export default function Header() {
         <NavLink to="/" end>
           {t('nav.home')}
         </NavLink>
+        <NavLink to="/catalog/event">{t('nav.events')}</NavLink>
         <NavLink to="/catalog/course">{t('nav.courses')}</NavLink>
         <NavLink to="/catalog/workshop">{t('nav.workshops')}</NavLink>
-        <NavLink to="/catalog/event">{t('nav.events')}</NavLink>
         {user ? (
           <>
             <NavLink to="/perfil">{t('nav.profile')}</NavLink>

@@ -16,7 +16,8 @@ import {
 import { ref, update, set, push } from 'firebase/database'
 import { db, DB_ROOT } from '../firebase'
 import { useLang } from '../i18n'
-import { useActivities, useAllUsers, useAllInscripciones, createInscription } from '../data/useData'
+import { useActivities, useAllUsers, useAllInscripciones, createInscription, useSurveyResponses } from '../data/useData'
+import { SURVEY_QUESTIONS } from '../data/survey'
 import { localize } from '../utils/localized'
 import { CURRENCY } from '../config'
 import CertificateModal from '../components/CertificateModal'
@@ -26,6 +27,29 @@ export default function AdminDashboard() {
   const { items: actividades } = useActivities()
   const { items: users } = useAllUsers()
   const { rows: inscripciones } = useAllInscripciones()
+  const { rows: surveyRows, loading: loadingSurvey } = useSurveyResponses()
+
+  // Métricas de la encuesta
+  const surveyActividad = useMemo(() => {
+    const ids = [...new Set(surveyRows.map((r) => r.actividadId))]
+    if (ids.length <= 1) return ids[0] || ''
+    return ''
+  }, [surveyRows])
+  const filteredSurvey = useMemo(
+    () => surveyActividad ? surveyRows.filter((r) => r.actividadId === surveyActividad) : surveyRows,
+    [surveyRows, surveyActividad]
+  )
+  const surveyTotals = useMemo(() => {
+    const out = {}
+    SURVEY_QUESTIONS.forEach((q) => {
+      const vals = filteredSurvey.map((r) => r.respuestas?.[q.id]).filter((v) => typeof v === 'number')
+      out[q.id] = {
+        count: vals.length,
+        avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+      }
+    })
+    return out
+  }, [filteredSurvey])
 
   const [selectedActId, setSelectedActId] = useState(actividades[0]?.id || '')
   const [manualForm, setManualForm] = useState({
@@ -614,6 +638,65 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* Encuestas de satisfacción */}
+      <section className="panel">
+        <div className="panel-head">
+          <FaAward />
+          <h3>Encuestas de satisfacción</h3>
+        </div>
+        {loadingSurvey ? (
+          <div className="loading">{t('cat.loading')}</div>
+        ) : filteredSurvey.length === 0 ? (
+          <div className="panel-empty">
+            <p>Aún no hay respuestas de encuestas.</p>
+          </div>
+        ) : (
+          <>
+            <p className="auth-hint">
+              {filteredSurvey.length} respuesta(s) · Promedio general:{' '}
+              <strong>
+                {(() => {
+                  const all = SURVEY_QUESTIONS.map((q) => surveyTotals[q.id]).filter((x) => x.count)
+                  return all.length ? (all.reduce((a, b) => a + b.avg, 0) / all.length).toFixed(2) : '—'
+                })()} / 4
+              </strong>
+            </p>
+            <div className="survey-metrics">
+              {SURVEY_QUESTIONS.map((q) => {
+                const m = surveyTotals[q.id]
+                const pct = m.count ? Math.round((m.avg / 4) * 100) : 0
+                return (
+                  <div className="survey-metric" key={q.id}>
+                    <div className="survey-metric-head">
+                      <span>{q.text}</span>
+                      <strong>{m.count ? `${m.avg.toFixed(2)} / 4` : '—'}</strong>
+                    </div>
+                    <div className="survey-metric-bar">
+                      <div className="survey-metric-fill" style={{ width: `${pct}%` }} />
+                    </div>
+                    <small>{m.count} respuesta(s)</small>
+                  </div>
+                )
+              })}
+            </div>
+
+            <h4 style={{ marginTop: '18px' }}>Comentarios y sugerencias</h4>
+            <ul className="list">
+              {filteredSurvey.filter((r) => r.comentarios && Object.values(r.comentarios).some((c) => c && c.trim())).map((r) => (
+                <li key={`${r.actividadId}-${r.uid}`} className="list-item">
+                  <div className="list-main">
+                    <strong>{r.user?.nombres} {r.user?.apellidos}</strong>
+                    {Object.entries(r.comentarios).filter(([, c]) => c && c.trim()).map(([k, c]) => (
+                      <span className="list-sub" key={k}>{c}</span>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
 
       {certRow && (

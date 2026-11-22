@@ -30,13 +30,13 @@ export default function Footer() {
           <h4>{t('footer.quickLinks')}</h4>
           <ul className="footer-links">
             <li>
+              <Link to="/catalog/event">{t('nav.events')}</Link>
+            </li>
+            <li>
               <Link to="/catalog/course">{t('nav.courses')}</Link>
             </li>
             <li>
               <Link to="/catalog/workshop">{t('nav.workshops')}</Link>
-            </li>
-            <li>
-              <Link to="/catalog/event">{t('nav.events')}</Link>
             </li>
             <li>
               <Link to="/perfil">{t('nav.profile')}</Link>

@@ -19,7 +19,7 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
 
 // Calcula el precio de una inscripción aplicando el descuento del plan vigente.
 // Devuelve siempre el desglose para poder guardarlo en la inscripción/factura.
-export function calcularPrecioInscripcion({ precio, profile, config, countParticipants = 1 }) {
+export function calcularPrecioInscripcion({ precio, profile, config, countParticipants = 1, actividad = null }) {
   const precioBase = round2(precio)
   const planAfiliacion = resolveAffiliationPlan(profile) || ''
   const porcentaje = planAfiliacion
@@ -27,7 +27,12 @@ export function calcularPrecioInscripcion({ precio, profile, config, countPartic
     : 0
 
   const descuentoUnitario = porcentaje > 0 ? round2((precioBase * porcentaje) / 100) : 0
-  const montoUnitario = Math.max(0, round2(precioBase - descuentoUnitario))
+  let montoUnitario = Math.max(0, round2(precioBase - descuentoUnitario))
+  let gratisAfiliados = false
+  if (actividad?.gratisAfiliados && planAfiliacion) {
+    montoUnitario = 0
+    gratisAfiliados = true
+  }
   const qty = Math.max(1, Number(countParticipants) || 1)
   const descuentoMonto = round2(descuentoUnitario * qty)
   const montoFinal = round2(montoUnitario * qty)
@@ -41,6 +46,7 @@ export function calcularPrecioInscripcion({ precio, profile, config, countPartic
     montoFinal,
     afiliado: !!planAfiliacion,
     planAfiliacion,
+    gratisAfiliados,
     countParticipants: qty
   }
 }

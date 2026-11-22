@@ -1,5 +1,5 @@
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { FaArrowLeft, FaCalendarDay, FaClock, FaUserGraduate, FaUsers, FaSackDollar, FaBullseye, FaListUl, FaChalkboardUser, FaUserCheck } from 'react-icons/fa6'
+import { FaArrowLeft, FaCalendarDay, FaClock, FaUserGraduate, FaUsers, FaSackDollar, FaBullseye, FaListUl, FaChalkboardUser, FaUserCheck, FaLocationDot } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
 import { useActivity, useAffiliationConfig } from '../data/useData'
@@ -14,7 +14,7 @@ export default function ActivityDetail() {
   const { user, profile } = useAuth()
   const { item, loading } = useActivity(id)
   const { config: affConfig } = useAffiliationConfig()
-  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig })
+  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig, actividad: item })
   const navigate = useNavigate()
 
   if (loading) return <div className="page"><div className="loading">{t('cat.loading')}</div></div>
@@ -60,14 +60,29 @@ export default function ActivityDetail() {
 
       <article className="detail-card">
         <div className={`detail-cover cover-${item.tipo}`}>
-        {item.imagen ? (
-          <img src={item.imagen} alt={title} className="detail-cover-img" loading="lazy" />
+        {item.imagenBanner || item.imagen ? (
+          <img src={item.imagenBanner || item.imagen} alt={title} className="detail-cover-img" loading="lazy" />
         ) : (
           <span className="detail-cover-letter">{title ? title.charAt(0) : '?'}</span>
         )}
       </div>
 
-        <div className="detail-body">
+      <div className="detail-enroll-top">
+        {user ? (
+          <button className="btn btn-primary btn-lg btn-block" onClick={() => navigate(`/inscribirse/${tipo}/${id}`)}>
+            {t('detail.inscribirse')}
+          </button>
+        ) : (
+          <div className="detail-login-msg">
+            <p>{t('detail.requireLogin')}</p>
+            <Link to="/" className="btn btn-primary btn-block">
+              {t('detail.loginNow')}
+            </Link>
+          </div>
+        )}
+      </div>
+
+      <div className="detail-body">
           <p className="detail-desc">{desc}</p>
 
           <h3 className="detail-section-title">{t('detail.getInfo')}</h3>
@@ -87,6 +102,11 @@ export default function ActivityDetail() {
             {item.horario && (
               <li>
                 <FaClock /> <strong>{t('detail.schedule')}:</strong> {item.horario}
+              </li>
+            )}
+            {localize(item.lugar, lang) && (
+              <li>
+                <FaLocationDot /> <strong>{t('detail.place')}:</strong> {localize(item.lugar, lang)}
               </li>
             )}
             {item.duracion && (
@@ -111,9 +131,14 @@ export default function ActivityDetail() {
             )}
             <li>
               <FaSackDollar /> <strong>{t('detail.price')}:</strong>{' '}
-              {(item.precio ?? 0) > 0 ? `${CURRENCY}${item.precio}` : t('detail.free')}
+              {(item.precio ?? 0) > 0 ? `${CURRENCY}${item.precio} + IVA` : t('detail.free')}
             </li>
-            {pricing.descuentoPorcentaje > 0 && (item.precio ?? 0) > 0 && (
+            {pricing.gratisAfiliados && (item.precio ?? 0) > 0 && (
+              <li className="detail-affiliate-price">
+                <FaUserCheck /> <strong>{t('insc.affiliatePrice')}:</strong> {t('detail.free')}
+              </li>
+            )}
+            {!pricing.gratisAfiliados && pricing.descuentoPorcentaje > 0 && (item.precio ?? 0) > 0 && (
               <li className="detail-affiliate-price">
                 <FaUserCheck /> <strong>{t('insc.affiliatePrice')}:</strong> {CURRENCY}{pricing.montoUnitario} · {t('insc.youSave')} {pricing.descuentoPorcentaje}%
               </li>
@@ -168,20 +193,6 @@ export default function ActivityDetail() {
             </div>
           )}
 
-          <div className="detail-actions">
-            {user ? (
-              <button className="btn btn-primary btn-lg btn-block" onClick={() => navigate(`/inscribirse/${tipo}/${id}`)}>
-                {t('detail.inscribirse')}
-              </button>
-            ) : (
-              <div className="detail-login-msg">
-                <p>{t('detail.requireLogin')}</p>
-                <Link to="/" className="btn btn-primary btn-block">
-                  {t('detail.loginNow')}
-                </Link>
-              </div>
-            )}
-          </div>
         </div>
       </article>
     </div>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { FaCalendarDay, FaClock } from 'react-icons/fa6'
+import { useState } from 'react'
+import { FaCalendarDay, FaClock, FaLocationDot, FaArrowRight, FaShare } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { CURRENCY } from '../config'
 import { useAuth } from '../auth/AuthContext'
@@ -15,54 +16,103 @@ export function formatDate(ts, lang) {
   })
 }
 
+function localized(value, lang) {
+  if (value && typeof value === 'object') return value[lang] || value.es || ''
+  return value || ''
+}
+
 export default function ActivityCard({ item }) {
   const { lang, t } = useLang()
   const { profile } = useAuth()
   const { config: affConfig } = useAffiliationConfig()
-  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig })
-  const title = item.titulo && typeof item.titulo === 'object' ? item.titulo[lang] : item.titulo
-  const desc =
-    item.descripcion && typeof item.descripcion === 'object'
-      ? item.descripcion[lang]
-      : item.descripcion
+  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig, actividad: item })
+  const title = localized(item.titulo, lang)
+  const desc = localized(item.descripcion, lang)
+  const lugar = localized(item.lugar, lang) || item.ubicacion || item.lugar || ''
+  const [shared, setShared] = useState(false)
+
+  const shareEvent = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const url = `${window.location.origin}/#/actividad/${item.tipo}/${item.id}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text: desc || title, url })
+        return
+      } catch {
+        /* cancelado: copiar */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setShared(true)
+      setTimeout(() => setShared(false), 2500)
+    } catch {
+      window.prompt('Copia este enlace:', url)
+    }
+  }
 
   return (
-    <Link to={`/actividad/${item.tipo}/${item.id}`} className="activity-card">
-      <div className={`activity-cover cover-${item.tipo}`}>
+    <article className="activity-card">
+      <Link to={`/actividad/${item.tipo}/${item.id}`} className={`activity-cover cover-${item.tipo}`}>
         <span className="activity-badge">{t(`type.${item.tipo}`)}</span>
         {item.imagen ? (
           <img src={item.imagen} alt={title} className="activity-cover-img" loading="lazy" />
         ) : (
           <span className="activity-cover-letter">{title ? title.charAt(0) : '?'}</span>
         )}
-      </div>
+      </Link>
       <div className="activity-body">
         <h3>{title}</h3>
-        <p className="activity-desc">{String(desc || '').slice(0, 110)}</p>
+
         <div className="activity-meta">
           {item.fechaInicio && (
-            <span>
-              <FaCalendarDay /> {formatDate(item.fechaInicio, lang)}
-            </span>
+            <span><FaCalendarDay /> {formatDate(item.fechaInicio, lang)}</span>
           )}
-          {item.duracion && (
-            <span>
-              <FaClock /> {item.duracion}
-            </span>
+          {item.horario && (
+            <span><FaClock /> {item.horario}</span>
+          )}
+          {!item.horario && item.duracion && (
+            <span><FaClock /> {item.duracion}</span>
+          )}
+          {lugar && (
+            <span><FaLocationDot /> {String(lugar)}</span>
           )}
         </div>
+
+        <p className="activity-desc">{String(desc || '').slice(0, 140)}</p>
+
         <div className="activity-footer">
           <span className="activity-price">
-            {(item.precio ?? 0) > 0 ? `${CURRENCY}${item.precio}` : t('detail.free')}
+            {(item.precio ?? 0) > 0 ? `${CURRENCY}${item.precio} + IVA` : t('detail.free')}
           </span>
-          <span className="activity-cta">→</span>
+          {pricing.gratisAfiliados && (item.precio ?? 0) > 0 && (
+            <span className="activity-affiliate-price">
+              {t('insc.affiliatePrice')}: {t('detail.free')}
+            </span>
+          )}
+          {!pricing.gratisAfiliados && pricing.descuentoPorcentaje > 0 && (item.precio ?? 0) > 0 && (
+            <span className="activity-affiliate-price">
+              {t('insc.affiliatePrice')}: {CURRENCY}{pricing.montoUnitario} · {t('insc.youSave')} {pricing.descuentoPorcentaje}%
+            </span>
+          )}
         </div>
-        {pricing.descuentoPorcentaje > 0 && (item.precio ?? 0) > 0 && (
-          <div className="activity-affiliate-price">
-            {t('insc.affiliatePrice')}: {CURRENCY}{pricing.montoUnitario} · {t('insc.youSave')} {pricing.descuentoPorcentaje}%
-          </div>
-        )}
+
+        <div className="activity-card-actions">
+          <Link to={`/actividad/${item.tipo}/${item.id}`} className="btn btn-outline activity-readmore">
+            {t('card.readMore')} <FaArrowRight />
+          </Link>
+          <button
+            type="button"
+            className="btn btn-outline btn-share-card"
+            onClick={shareEvent}
+            title={t('detail.share')}
+            aria-label={t('detail.share')}
+          >
+            <FaShare /> {shared ? '✓' : ''}
+          </button>
+        </div>
       </div>
-    </Link>
+    </article>
   )
 }

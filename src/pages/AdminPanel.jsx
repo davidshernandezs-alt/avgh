@@ -56,6 +56,7 @@ import AdminAffiliationRequests from './AdminAffiliationRequests'
 import AdminDashboard from './AdminDashboard'
 import TicketModal from '../components/TicketModal'
 import CertificateModal from '../components/CertificateModal'
+import Toggle from '../components/Toggle'
 
 const paymentLabels = {
   transfer: 'insc.payment.transfer',
@@ -407,6 +408,8 @@ function ActivityForm({ initial, onCancel }) {
         : initial.modalidad || 'online',
     duracion: initial.duracion || '',
     horario: initial.horario || '',
+    lugarEs: titular(initial.lugar).es,
+    lugarEn: titular(initial.lugar).en,
     objEs: titular(initial.objetivoGeneral).es,
     objEn: titular(initial.objetivoGeneral).en,
     conEs: listToText(initial.contenido),
@@ -415,17 +418,19 @@ function ActivityForm({ initial, onCancel }) {
     fechaInicio: initial.fechaInicio ? new Date(initial.fechaInicio).toISOString().slice(0, 10) : '',
     precio: initial.precio != null ? String(initial.precio) : '',
     cupo: initial.cupo != null ? String(initial.cupo) : '',
-    imagen: initial.imagen || ''
+    gratisAfiliados: !!initial.gratisAfiliados,
+    imagen: initial.imagen || '',
+    imagenBanner: initial.imagenBanner || ''
   }))
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  const onFoto = async (e) => {
+  const onFoto = async (e, key = 'imagen') => {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const stored = await fileToStorable(file, 900)
-      setForm((f) => ({ ...f, imagen: stored.dataUrl }))
+      const stored = await fileToStorable(file, 900, key === 'imagenBanner' ? 'banner' : 'square')
+      setForm((f) => ({ ...f, [key]: stored.dataUrl }))
     } catch (err) {
       setMsg(err.message === 'too-large' ? t('admin.imageTooLarge') : t('admin.imageBadType'))
     }
@@ -447,13 +452,16 @@ function ActivityForm({ initial, onCancel }) {
         modalidad: form.modalidad,
         duracion: form.duracion,
         horario: form.horario,
+        lugar: { es: form.lugarEs, en: form.lugarEn },
         objetivoGeneral: { es: form.objEs, en: form.objEn },
         contenido: { es: form.conEs, en: form.conEn },
         facilitadores: form.facilitadores.split('\n').map((s) => s.trim()).filter(Boolean),
         fechaInicio: form.fechaInicio ? new Date(`${form.fechaInicio}T12:00:00`).getTime() : null,
         precio: Number(form.precio) || 0,
         cupo: Number(form.cupo) || 0,
-        imagen: form.imagen
+        gratisAfiliados: !!form.gratisAfiliados,
+        imagen: form.imagen,
+        imagenBanner: form.imagenBanner
       }
       await saveActividad(form.id, act)
       setMsg(t('admin.saved'))
@@ -524,6 +532,17 @@ function ActivityForm({ initial, onCancel }) {
 
         <div className="field-row">
           <label className="field-label">
+            <span>{t('admin.form.lugarEs')}</span>
+            <input className="input" value={form.lugarEs} onChange={set('lugarEs')} placeholder="Ej. Sede AVGH, Caracas" />
+          </label>
+          <label className="field-label">
+            <span>{t('admin.form.lugarEn')}</span>
+            <input className="input" value={form.lugarEn} onChange={set('lugarEn')} placeholder="Ej. AVGH HQ, Caracas" />
+          </label>
+        </div>
+
+        <div className="field-row">
+          <label className="field-label">
             <span>{t('admin.form.objEs')}</span>
             <textarea className="input textarea" value={form.objEs} onChange={set('objEs')} />
           </label>
@@ -564,16 +583,39 @@ function ActivityForm({ initial, onCancel }) {
           </label>
         </div>
 
+        <div className="field-label gratis-afiliados-box">
+          <Toggle
+            id="gratisAfiliados"
+            checked={form.gratisAfiliados}
+            onChange={(v) => setForm((f) => ({ ...f, gratisAfiliados: v }))}
+            label={t('admin.form.gratisAfiliados')}
+          />
+          <em>{t('admin.form.gratisAfiliadosHint')}</em>
+        </div>
+
         <div className="field-label">
-          <span>{t('admin.form.foto')} <em style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--muted)' }}>(Recomendado: 800 x 500 px, máx 4MB)</em></span>
+          <span>{t('admin.form.foto')} <em style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--muted)' }}>(1:1 · se ve en el listado de próximos eventos)</em></span>
           <div className="course-photo-row">
             {form.imagen ? (
               <img src={form.imagen} alt="" className="course-photo-preview" />
             ) : (
               <div className="course-photo-empty"><FaImage /></div>
             )}
-            <input type="file" accept="image/jpeg,image/png" className="hidden-input" id="act-foto" onChange={onFoto} />
+            <input type="file" accept="image/jpeg,image/png" className="hidden-input" id="act-foto" onChange={(e) => onFoto(e, 'imagen')} />
             <label htmlFor="act-foto" className="btn btn-ghost btn-sm">Subir foto</label>
+          </div>
+        </div>
+
+        <div className="field-label">
+          <span>{t('admin.form.fotoBanner')} <em style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--muted)' }}>(panorámica · se ve en la vista de detalle)</em></span>
+          <div className="course-photo-row">
+            {form.imagenBanner ? (
+              <img src={form.imagenBanner} alt="" className="course-photo-preview course-photo-preview-wide" />
+            ) : (
+              <div className="course-photo-empty course-photo-empty-wide"><FaImage /></div>
+            )}
+            <input type="file" accept="image/jpeg,image/png" className="hidden-input" id="act-foto-banner" onChange={(e) => onFoto(e, 'imagenBanner')} />
+            <label htmlFor="act-foto-banner" className="btn btn-ghost btn-sm">Subir banner</label>
           </div>
         </div>
 
