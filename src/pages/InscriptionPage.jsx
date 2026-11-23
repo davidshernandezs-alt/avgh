@@ -5,7 +5,7 @@ import { ref, onValue, set } from 'firebase/database'
 import { db, DB_ROOT } from '../firebase'
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
-import { useActivity, createInscription, useBankConfig, uploadComprobante, useMyInscriptions, useAffiliationConfig } from '../data/useData'
+import { useActivity, createInscriptionWithCapacity, useBankConfig, uploadComprobante, useMyInscriptions, useAffiliationConfig, useInscripcionesCount } from '../data/useData'
 import { calcularPrecioInscripcion } from '../data/pricing'
 import { fileToStorable } from '../utils/files'
 import Toggle from '../components/Toggle'
@@ -19,6 +19,12 @@ export default function InscriptionPage() {
   const { config: bank } = useBankConfig()
   const { config: affConfig } = useAffiliationConfig()
   const { items: myInscriptions } = useMyInscriptions(user?.uid)
+  const counts = useInscripcionesCount()
+  const cupoTotal = Math.max(0, Number(item?.cupo) || 0)
+  const ocupados = counts[id] || 0
+  const disponibles = cupoTotal > 0 ? Math.max(0, cupoTotal - ocupados) : Infinity
+  const cupoLleno = disponibles <= 0
+  const [listaEspera, setListaEspera] = useState(false)
   const [metodoPago, setMetodoPago] = useState('transfer')
   const [comprobanteFile, setComprobanteFile] = useState(null)
   const [terms, setTerms] = useState(false)
@@ -217,12 +223,14 @@ export default function InscriptionPage() {
 
         // Inscribir individualmente a cada empleado seleccionado
         let lastResult = null
+        let reservados = 0
         for (const empId of selectedEmployees) {
           const empData = employeesList.find((e) => e.id === empId)
           if (empData) {
             const fakeUid = `emp_${empData.dni ? empData.dni.replace(/\D/g, '') : Date.now()}_${Math.floor(Math.random() * 1000)}`
-            lastResult = await createInscription({
+            lastResult = await createInscriptionWithCapacity({
               uid: fakeUid,
+              yaReservados: reservados,
               actividad: item,
               user: {
                 nombres: empData.nombres,
@@ -252,6 +260,7 @@ export default function InscriptionPage() {
                 countParticipants: 1
               }
             })
+            if (!lastResult.listaEspera) reservados += 1
             // Actualizar la última actividad asociada al empleado en la DB
             await set(ref(db, `${DB_ROOT}/companies/${user.uid}/employees/${empId}/actividadId`), item.id)
           }
@@ -265,7 +274,7 @@ export default function InscriptionPage() {
         }
 
         // Inscribir al titular de la cuenta
-        const result = await createInscription({ 
+        const result = await createInscriptionWithCapacity({ 
           uid: user.uid, 
           actividad: item, 
           user: {
@@ -331,6 +340,14 @@ export default function InscriptionPage() {
           <span className="activity-badge">{t(`type.${item.tipo}`)}</span>
           <strong>{title}</strong>
         </div>
+
+        {cupoTotal > 0 && (
+          <div className={`cupo-msg ${cupoLleno ? 'is-full' : ''}`}>
+            <FaUsers /> {cupoLleno
+              ? 'Cupo completo · Al inscribirte quedarás en lista de espera'
+              : `¡Quedan ${disponibles} ${disponibles === 1 ? 'cupo disponible' : 'cupos disponibles'}!`}
+          </div>
+        )}
 
         <div className="insc-form-section">
           <h4 className="detail-section-title">Datos personales</h4>

@@ -161,6 +161,38 @@ export function useMyFacturas(uid) {
   return { items, loading, error }
 }
 
+// Inscripción atómica con control de cupo: solo ocupa si quedan lugares.
+// Si no hay, se registra en lista de espera.
+export async function createInscriptionWithCapacity({ uid, actividad, user, metodoPago, estado, monto, desglose, afiliado, planAfiliacion, facturacion, yaReservados = 0 }) {
+  const actId = actividad?.id
+  const cupo = Number(actividad?.cupo) || 0
+  const inscRef = ref(db, `${DB_ROOT}/inscripciones/${uid}/${actId}`)
+  const existing = await get(inscRef)
+  if (existing.exists()) throw new Error('Ya te encuentras inscrito en esta actividad.')
+
+  let enEspera = false
+  if (cupo > 0) {
+    const allRef = ref(db, `${DB_ROOT}/inscripciones`)
+    const snap = await get(allRef)
+    const all = snap.val() || {}
+    let ocupados = 0
+    Object.values(all).forEach((acts) => {
+      const ins = acts?.[actId]
+      if (ins && ins.estado !== 'rechazada' && ins.listaEspera !== true) ocupados += 1
+    })
+    // Se ruega pasar el conteo ya reservado en esta misma operación (varios empleados)
+    ocupados += Number(yaReservados) || 0
+    enEspera = ocupados >= cupo
+  }
+
+  return createInscription({
+    uid, actividad, user, metodoPago, estado,
+    monto: enEspera ? 0 : monto,
+    desglose, afiliado, planAfiliacion, facturacion,
+    listaEspera: enEspera
+  })
+}
+
 export async function createInscription({
   uid,
   actividad,
@@ -172,7 +204,8 @@ export async function createInscription({
   desglose = null,
   afiliado = null,
   planAfiliacion = '',
-  facturacion = null
+  facturacion = null,
+  listaEspera = false
 }) {
   if (!uid) throw new Error('UID de usuario ausente')
   if (!actividad?.id) throw new Error('ID de actividad ausente')
@@ -219,7 +252,8 @@ export async function createInscription({
       : {}),
     ...(afiliado !== null ? { afiliado } : {}),
     ...(planAfiliacion ? { planAfiliacion } : {}),
-    ...(facturacion ? { facturacion } : {})
+    ...(facturacion ? { facturacion } : {}),
+    ...(listaEspera ? { listaEspera: true, estado: 'lista_espera' } : {})
   }
 
   const updates = {}
@@ -239,6 +273,33 @@ export async function fetchActividad(id) {
 
 // Todas las inscripciones con la información del usuario, la actividad y la
 // factura fusionadas, para el panel del administrador.
+// Cuenta de inscripciones por actividad (para cupos en catálogo/detalle).
+export function useInscripcionesCount() {
+  const [counts, setCounts] = useState({})
+  useEffect(() => {
+    const r = ref(db, `${DB_ROOT}/inscripciones`)
+    let active = true
+    const h = onValue(
+      r,
+      (snap) => {
+        if (!active) return
+        const val = snap.val() || {}
+        const next = {}
+        Object.entries(val).forEach(([uid, acts]) => {
+          Object.entries(acts || {}).forEach(([actividadId, data]) => {
+            if (data?.estado === 'rechazada' || data?.listaEspera === true) return
+            next[actividadId] = (next[actividadId] || 0) + 1
+          })
+        })
+        setCounts(next)
+      },
+      () => {}
+    )
+    return () => { active = false; off(r, 'value', h) }
+  }, [])
+  return counts
+}
+
 export function useAllInscripciones() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)

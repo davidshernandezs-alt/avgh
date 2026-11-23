@@ -3321,6 +3321,23 @@ textarea {
   }
 }
 
+.cupo-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.cupo-msg.is-full {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
 /* ============ FORMULARIO DE INSCRIPCIÓN ============ */
 .insc-form-section {
   display: flex;

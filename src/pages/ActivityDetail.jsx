@@ -2,7 +2,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { FaArrowLeft, FaCalendarDay, FaClock, FaUserGraduate, FaUsers, FaSackDollar, FaBullseye, FaListUl, FaChalkboardUser, FaUserCheck, FaLocationDot } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
-import { useActivity, useAffiliationConfig, useMyInscriptions } from '../data/useData'
+import { useActivity, useAffiliationConfig, useMyInscriptions, useInscripcionesCount } from '../data/useData'
 import { calcularPrecioInscripcion, tipoAsistenteEn } from '../data/pricing'
 import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
@@ -15,6 +15,15 @@ export default function ActivityDetail() {
   const { item, loading } = useActivity(id)
   const { config: affConfig } = useAffiliationConfig()
   const { items: misInscripciones } = useMyInscriptions(user?.uid)
+  const counts = useInscripcionesCount()
+  const cupoTotal = Math.max(0, Number(item?.cupo) || 0)
+  const ocupados = counts[id] || 0
+  const disponibles = cupoTotal > 0 ? Math.max(0, cupoTotal - ocupados) : null
+  const cupoMsg = cupoTotal > 0
+    ? disponibles > 0
+      ? `¡Quedan ${disponibles} ${disponibles === 1 ? 'cupo disponible' : 'cupos disponibles'}!`
+      : 'Cupo completo · No hay cupos disponibles'
+    : ''
   const pricing = calcularPrecioInscripcion({
     precio: item?.precio,
     profile,
@@ -76,8 +85,8 @@ export default function ActivityDetail() {
 
       <div className="detail-enroll-top">
         {user ? (
-          <button className="btn btn-primary btn-lg btn-block" onClick={() => navigate(`/inscribirse/${tipo}/${id}`)}>
-            {t('detail.inscribirse')}
+          <button className="btn btn-primary btn-lg btn-block" onClick={() => navigate(`/inscribirse/${tipo}/${id}`)} disabled={disponibles === 0}>
+            {disponibles === 0 ? 'Cupo completo' : t('detail.inscribirse')}
           </button>
         ) : (
           <div className="detail-login-msg">
@@ -134,6 +143,11 @@ export default function ActivityDetail() {
             {item.cupo && (
               <li>
                 <FaUsers /> <strong>{t('detail.cupo')}:</strong> {item.cupo}
+              </li>
+            )}
+            {cupoMsg && (
+              <li className={`cupo-msg ${disponibles === 0 ? 'is-full' : ''}`}>
+                <FaUsers /> {cupoMsg}
               </li>
             )}
             <li>

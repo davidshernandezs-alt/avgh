@@ -313,6 +313,20 @@ export default function AdminDashboard() {
                 <small>Sillas Libres / Por Llegar (Gris)</small>
               </div>
             </div>
+            <div className="aforo-stat-item is-pending">
+              <span className="dot" />
+              <div>
+                <strong>{cupoNum > 0 ? Math.max(0, cupoNum - courseInscripciones.filter((i) => i.listaEspera !== true && i.estado !== 'rechazada').length) : '∞'}</strong>
+                <small>Cupos disponibles</small>
+              </div>
+            </div>
+            <div className="aforo-stat-item is-guest">
+              <span className="dot" />
+              <div>
+                <strong>{courseInscripciones.filter((i) => i.listaEspera === true && i.estado !== 'rechazada').length}</strong>
+                <small>En lista de espera</small>
+              </div>
+            </div>
           </div>
 
           <div className="seats-grid">
@@ -345,8 +359,22 @@ export default function AdminDashboard() {
                         </span>
                       </div>
                       <div className="profile-insc-actions">
+                        {ins.listaEspera === true && (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={async () => {
+                              await update(ref(db, `${DB_ROOT}/inscripciones/${ins.uid}/${ins.actividadId}`), {
+                                listaEspera: false,
+                                estado: 'confirmada'
+                              })
+                            }}
+                          >
+                            <FaCheck /> Confirmar (pasa a lista)
+                          </button>
+                        )}
                         <span className={`badge badge-${isPresent ? 'Confirmada' : 'pendiente'}`}>
-                          {isPresent ? '✅ Presente (En Sala)' : '⏳ Pendiente de Llegada'}
+                          {ins.listaEspera === true ? '📋 Lista de espera' : isPresent ? '✅ Presente (En Sala)' : '⏳ Pendiente de Llegada'}
                         </span>
                         <button
                           type="button"
