@@ -1,8 +1,0 @@
-node_modules
-dist
-dist-singlefile
-AVGH-app.html
-*.pdf
-*.lnk
-.git
-*.log
