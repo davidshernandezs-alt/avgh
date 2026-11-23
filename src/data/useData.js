@@ -171,7 +171,8 @@ export async function createInscription({
   monto,
   desglose = null,
   afiliado = null,
-  planAfiliacion = ''
+  planAfiliacion = '',
+  facturacion = null
 }) {
   if (!uid) throw new Error('UID de usuario ausente')
   if (!actividad?.id) throw new Error('ID de actividad ausente')
@@ -217,7 +218,8 @@ export async function createInscription({
         }
       : {}),
     ...(afiliado !== null ? { afiliado } : {}),
-    ...(planAfiliacion ? { planAfiliacion } : {})
+    ...(planAfiliacion ? { planAfiliacion } : {}),
+    ...(facturacion ? { facturacion } : {})
   }
 
   const updates = {}
@@ -805,6 +807,68 @@ export async function saveUserCertificate({ uid, actividadId, data }) {
   }
   await update(ref(db, '/'), updates)
   return payload
+}
+
+// Preguntas en vivo del Q&A por actividad.
+export function usePreguntas(actividadId) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!actividadId) {
+      setRows([])
+      setLoading(false)
+      return undefined
+    }
+    const r = ref(db, `${DB_ROOT}/preguntas/${actividadId}`)
+    let active = true
+    const h = onValue(
+      r,
+      (snap) => {
+        if (!active) return
+        const val = snap.val() || {}
+        const list = Object.entries(val).map(([id, data]) => ({ id, ...data }))
+        list.sort((a, b) => (a.fecha || 0) - (b.fecha || 0))
+        setRows(list)
+        setLoading(false)
+      },
+      () => { if (active) setLoading(false) }
+    )
+    return () => { active = false; off(r, 'value', h) }
+  }, [actividadId])
+
+  return { rows, loading }
+}
+
+export async function addPregunta({ actividadId, texto, uid, user }) {
+  if (!actividadId || !texto?.trim()) throw new Error('Faltan datos de la pregunta')
+  const r = push(ref(db, `${DB_ROOT}/preguntas/${actividadId}`))
+  await set(r, {
+    uid: uid || '',
+    user: {
+      nombres: user?.nombres || '',
+      apellidos: user?.apellidos || '',
+      email: user?.email || '',
+      dni: user?.dni || ''
+    },
+    texto: texto.trim(),
+    fecha: Date.now(),
+    respondida: false
+  })
+  return r.key
+}
+
+export async function setPreguntaRespondida(actividadId, preguntaId, respondida) {
+  if (!actividadId || !preguntaId) return
+  await update(ref(db, `${DB_ROOT}/preguntas/${actividadId}/${preguntaId}`), {
+    respondida: !!respondida,
+    respondidaFecha: respondida ? Date.now() : null
+  })
+}
+
+export async function deletePregunta(actividadId, preguntaId) {
+  if (!actividadId || !preguntaId) return
+  await remove(ref(db, `${DB_ROOT}/preguntas/${actividadId}/${preguntaId}`))
 }
 
 export async function submitSurvey({ uid, actividadId, actividadTitulo, respuestas, comentarios, user }) {

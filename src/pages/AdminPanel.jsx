@@ -24,7 +24,8 @@ import {
   FaBuildingColumns,
   FaBookOpen,
   FaIdCard,
-  FaAward
+  FaAward,
+  FaCircleQuestion
 } from 'react-icons/fa6'
 import * as XLSX from 'xlsx'
 import { useLang } from '../i18n'
@@ -56,6 +57,7 @@ import AdminAffiliationRequests from './AdminAffiliationRequests'
 import AdminDashboard from './AdminDashboard'
 import TicketModal from '../components/TicketModal'
 import CertificateModal from '../components/CertificateModal'
+import AdminQuestions from '../components/AdminQuestions'
 import Toggle from '../components/Toggle'
 
 const paymentLabels = {
@@ -223,8 +225,9 @@ function RequestsTab() {
       </section>
 
       {row && (
-        <section className="panel admin-detail">
-          <div className="admin-detail-head">
+        <div className="qr-modal-backdrop admin-review-backdrop" onClick={() => setSelected(null)}>
+          <section className="panel admin-detail" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-detail-head">
             <h3>{t('admin.review')}</h3>
             <button className="btn-icon" onClick={() => setSelected(null)} aria-label={t('admin.close')}>
               <FaXmark />
@@ -379,7 +382,8 @@ function RequestsTab() {
             )}
             {msg && <p className="form-success">{msg}</p>}
           </div>
-        </section>
+          </section>
+        </div>
       )}
     </>
   )
@@ -1202,6 +1206,9 @@ export default function AdminPanel() {
         <button className={tab === 'courses' ? 'is-active' : ''} onClick={() => setTab('courses')} title={t('admin.tabCourses')}>
           <FaBookOpen className="admin-tab-icon" /> <span className="admin-tab-label">{t('admin.tabCourses')}</span>
         </button>
+        <button className={tab === 'qa' ? 'is-active' : ''} onClick={() => setTab('qa')} title="Preguntas en vivo">
+          <FaCircleQuestion className="admin-tab-icon" /> <span className="admin-tab-label">Preguntas</span>
+        </button>
       </div>
 
       {tab === 'dashboard' ? (
@@ -1222,6 +1229,8 @@ export default function AdminPanel() {
         <AdminBankConfig />
       ) : tab === 'affiliation' ? (
         <AdminAffiliationConfig />
+      ) : tab === 'qa' ? (
+        <AdminQuestions />
       ) : (
         <CoursesTab />
       )}

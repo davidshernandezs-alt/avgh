@@ -19,7 +19,16 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100
 
 // Calcula el precio de una inscripción aplicando el descuento del plan vigente.
 // Devuelve siempre el desglose para poder guardarlo en la inscripción/factura.
-export function calcularPrecioInscripcion({ precio, profile, config, countParticipants = 1, actividad = null }) {
+// Devuelve el tipo de asistente del usuario en una actividad concreta.
+export function tipoAsistenteEn(inscripciones, actividadId) {
+  const ins = (inscripciones || []).find((i) => i.actividadId === actividadId)
+  return ins?.tipoAsistente || ''
+}
+
+const esGratisPorTipo = (tipo) =>
+  ['exonerado', 'invitado', 'junta', 'facilitador'].includes(tipo || '')
+
+export function calcularPrecioInscripcion({ precio, profile, config, countParticipants = 1, actividad = null, tipoAsistente = '' }) {
   const precioBase = round2(precio)
   const planAfiliacion = resolveAffiliationPlan(profile) || ''
   const porcentaje = planAfiliacion
@@ -30,6 +39,10 @@ export function calcularPrecioInscripcion({ precio, profile, config, countPartic
   let montoUnitario = Math.max(0, round2(precioBase - descuentoUnitario))
   let gratisAfiliados = false
   if (actividad?.gratisAfiliados && planAfiliacion) {
+    montoUnitario = 0
+    gratisAfiliados = true
+  }
+  if (esGratisPorTipo(tipoAsistente)) {
     montoUnitario = 0
     gratisAfiliados = true
   }

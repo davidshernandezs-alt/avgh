@@ -4,8 +4,8 @@ import { FaCalendarDay, FaClock, FaLocationDot, FaArrowRight, FaShare } from 're
 import { useLang } from '../i18n'
 import { CURRENCY } from '../config'
 import { useAuth } from '../auth/AuthContext'
-import { useAffiliationConfig } from '../data/useData'
-import { calcularPrecioInscripcion } from '../data/pricing'
+import { useAffiliationConfig, useMyInscriptions } from '../data/useData'
+import { calcularPrecioInscripcion, tipoAsistenteEn } from '../data/pricing'
 
 export function formatDate(ts, lang) {
   if (!ts) return ''
@@ -23,9 +23,16 @@ function localized(value, lang) {
 
 export default function ActivityCard({ item }) {
   const { lang, t } = useLang()
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
   const { config: affConfig } = useAffiliationConfig()
-  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig, actividad: item })
+  const { items: misInscripciones } = useMyInscriptions(user?.uid)
+  const pricing = calcularPrecioInscripcion({
+    precio: item?.precio,
+    profile,
+    config: affConfig,
+    actividad: item,
+    tipoAsistente: tipoAsistenteEn(misInscripciones, item?.id)
+  })
   const title = localized(item.titulo, lang)
   const desc = localized(item.descripcion, lang)
   const lugar = localized(item.lugar, lang) || item.ubicacion || item.lugar || ''

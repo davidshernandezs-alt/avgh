@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FaArrowLeft, FaCircleCheck, FaXmark, FaUsers, FaUserCheck } from 'react-icons/fa6'
 import { ref, onValue, set } from 'firebase/database'
@@ -8,12 +8,13 @@ import { useAuth } from '../auth/AuthContext'
 import { useActivity, createInscription, useBankConfig, uploadComprobante, useMyInscriptions, useAffiliationConfig } from '../data/useData'
 import { calcularPrecioInscripcion } from '../data/pricing'
 import { fileToStorable } from '../utils/files'
+import Toggle from '../components/Toggle'
 import { CURRENCY } from '../config'
 
 export default function InscriptionPage() {
   const { tipo, id } = useParams()
   const { lang, t } = useLang()
-  const { user, profile } = useAuth()
+  const { user, profile, updateProfileData } = useAuth()
   const { item, loading } = useActivity(id)
   const { config: bank } = useBankConfig()
   const { config: affConfig } = useAffiliationConfig()
@@ -27,6 +28,67 @@ export default function InscriptionPage() {
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [showTermsModal, setShowTermsModal] = useState(false)
   const [employeesList, setEmployeesList] = useState([])
+  const [form, setForm] = useState({
+    nombres: '', apellidos: '', dni: '', cedula: '', email: '', telefono: '', telefonoCelular: '',
+    rif: '', nombreEmpresa: '', telefonoEmpresa: '', cargo: '',
+    direccionFiscal: '', direccionOficina: '',
+    contactoFacturaNombre: '', contactoFacturaEmail: '',
+    responsableNombre: '', responsableTelefono: '', comoSeEntero: '', comoSeEnteroOtro: ''
+  })
+  const [facturaJuridica, setFacturaJuridica] = useState(false)
+  const formReady = useRef(false)
+
+  // Prellenar con el perfil (puede llegar después del mount) y permitir editar.
+  useEffect(() => {
+    if (!profile || formReady.current) return
+    formReady.current = true
+    const juridico = profile.tipoPersona === 'juridico' || !!profile.rif || !!profile.nombreEmpresa
+    setFacturaJuridica(juridico)
+    setForm((f) => ({
+      ...f,
+      nombres: profile.nombres || '',
+      apellidos: profile.apellidos || '',
+      dni: profile.dni || '',
+      cedula: profile.cedula || profile.dni || '',
+      email: profile.email || user?.email || '',
+      telefono: profile.telefono || profile.telefonoCelular || '',
+      telefonoCelular: profile.telefonoCelular || profile.telefono || '',
+      rif: profile.rif || '',
+      nombreEmpresa: profile.nombreEmpresa || profile.empresa || '',
+      telefonoEmpresa: profile.telefonoEmpresa || '',
+      cargo: profile.cargo || '',
+      direccionFiscal: profile.direccionFiscal || '',
+      direccionOficina: profile.direccionOficina || '',
+      contactoFacturaNombre: profile.contactoFacturaNombre || '',
+      contactoFacturaEmail: profile.contactoFacturaEmail || '',
+      responsableNombre: profile.responsableNombre || '',
+      responsableTelefono: profile.responsableTelefono || '',
+      comoSeEntero: profile.comoSeEntero || ''
+    }))
+  }, [profile, user])
+
+  const datosFacturacion = {
+    facturaJuridica,
+    nombres: form.nombres,
+    apellidos: form.apellidos,
+    dni: form.dni || form.cedula,
+    cedula: form.cedula || form.dni,
+    email: form.email,
+    telefono: form.telefono,
+    rif: facturaJuridica ? form.rif : '',
+    nombreEmpresa: facturaJuridica ? form.nombreEmpresa : '',
+    telefonoEmpresa: facturaJuridica ? form.telefonoEmpresa : '',
+    cargo: facturaJuridica ? form.cargo : '',
+    direccionFiscal: facturaJuridica ? form.direccionFiscal : '',
+    direccionOficina: facturaJuridica ? form.direccionOficina : '',
+    contactoFacturaNombre: facturaJuridica ? form.contactoFacturaNombre : '',
+    contactoFacturaEmail: facturaJuridica ? form.contactoFacturaEmail : '',
+    responsableNombre: form.responsableNombre,
+    responsableTelefono: form.responsableTelefono,
+    comoSeEntero: form.comoSeEntero === 'otro' ? (form.comoSeEnteroOtro || 'Otro') : form.comoSeEntero
+  }
+
+  const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
   // Cargar lista de empleados de la empresa si el usuario es de tipo jurídico
   useEffect(() => {
@@ -167,8 +229,14 @@ export default function InscriptionPage() {
                 apellidos: empData.apellidos || '',
                 dni: empData.dni,
                 email: empData.email || `${empData.dni}@avgh.local`,
-                empresa: profile?.nombreEmpresa || ''
+                empresa: profile?.nombreEmpresa || '',
+                ...datosFacturacion,
+                nombres: empData.nombres,
+                apellidos: empData.apellidos || '',
+                dni: empData.dni,
+                email: empData.email || `${empData.dni}@avgh.local`
               },
+              facturacion: datosFacturacion,
               metodoPago: isFree ? 'gratis' : metodoPago,
               estado: 'pendiente',
               monto: isFree ? 0 : montoUnitario,
@@ -201,12 +269,14 @@ export default function InscriptionPage() {
           uid: user.uid, 
           actividad: item, 
           user: {
-            nombres: profile?.nombres || user.displayName || 'Participante',
-            apellidos: profile?.apellidos || '',
-            dni: profile?.dni || user.email || '',
-            email: profile?.email || user.email || '',
-            telefono: profile?.telefono || ''
+            ...datosFacturacion,
+            nombres: form.nombres || user.displayName || 'Participante',
+            apellidos: form.apellidos || '',
+            dni: form.dni || user.email || '',
+            email: form.email || user.email || '',
+            telefono: form.telefono || ''
           },
+          facturacion: datosFacturacion,
           metodoPago: isFree ? 'gratis' : metodoPago,
           monto: isFree ? 0 : montoUnitario,
           afiliado: pricing.afiliado,
@@ -221,6 +291,18 @@ export default function InscriptionPage() {
             countParticipants: 1
           }
         })
+        try {
+          await updateProfileData({
+            nombres: form.nombres, apellidos: form.apellidos, dni: form.dni,
+            cedula: form.cedula, email: form.email, telefono: form.telefono,
+            telefonoCelular: form.telefonoCelular, rif: form.rif,
+            nombreEmpresa: form.nombreEmpresa, telefonoEmpresa: form.telefonoEmpresa,
+            cargo: form.cargo, direccionFiscal: form.direccionFiscal,
+            direccionOficina: form.direccionOficina, contactoFacturaNombre: form.contactoFacturaNombre,
+            contactoFacturaEmail: form.contactoFacturaEmail, responsableNombre: form.responsableNombre,
+            responsableTelefono: form.responsableTelefono, comoSeEntero: datosFacturacion.comoSeEntero
+          })
+        } catch { /* no bloqueamos la inscripción si falla la actualización del perfil */ }
         setDone(result)
       }
     } catch (err) {
@@ -250,10 +332,39 @@ export default function InscriptionPage() {
           <strong>{title}</strong>
         </div>
 
-        <label className="field-label">
-          <span>{t('insc.fullName')}</span>
-          <input className="input" value={fullName} readOnly />
-        </label>
+        <div className="insc-form-section">
+          <h4 className="detail-section-title">Datos personales</h4>
+          <div className="field-row">
+            <label className="field-label">
+              <span>{t('home.lastName')} / Apellidos</span>
+              <input className="input" value={form.apellidos} onChange={setField('apellidos')} required />
+            </label>
+            <label className="field-label">
+              <span>{t('home.firstName')} / Nombres</span>
+              <input className="input" value={form.nombres} onChange={setField('nombres')} required />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field-label">
+              <span>CI / Documento</span>
+              <input className="input" value={form.dni} onChange={setField('dni')} required />
+            </label>
+            <label className="field-label">
+              <span>{t('insc.email')}</span>
+              <input type="email" className="input" value={form.email} onChange={setField('email')} required />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field-label">
+              <span>N° Cel.</span>
+              <input className="input" value={form.telefono} onChange={setField('telefono')} />
+            </label>
+            <label className="field-label">
+              <span>Teléfono fijo (opcional)</span>
+              <input className="input" value={form.telefonoCelular} onChange={setField('telefonoCelular')} />
+            </label>
+          </div>
+        </div>
 
         {isCompany && (
           <div className="admin-section" style={{ margin: '16px 0', padding: '16px', background: 'var(--bg-muted)', borderRadius: '10px' }}>
@@ -310,15 +421,90 @@ export default function InscriptionPage() {
           </div>
         )}
 
-        <label className="field-label">
-          <span>{t('insc.email')}</span>
-          <input className="input" value={profile?.email || user.email || ''} readOnly />
-        </label>
+        <div className="insc-form-section">
+          <div className="field-label gratis-afiliados-box">
+            <Toggle
+              id="facturaJuridica"
+              checked={facturaJuridica}
+              onChange={setFacturaJuridica}
+              label="¿Requiere factura jurídica?"
+            />
+            <em>Active esta opción si la factura se emitirá a nombre de una empresa. Si no, se emitirá como factura natural a su nombre.</em>
+          </div>
 
-        <label className="field-label">
-          <span>{t('insc.phone')}</span>
-          <input className="input" value={profile?.telefono || ''} readOnly />
-        </label>
+          {facturaJuridica && (
+            <div className="insc-company-fields">
+              <h4 className="detail-section-title">Datos de la empresa (para facturación)</h4>
+              <div className="field-row">
+                <label className="field-label">
+                  <span>Nombre de la Empresa</span>
+                  <input className="input" value={form.nombreEmpresa} onChange={setField('nombreEmpresa')} required />
+                </label>
+                <label className="field-label">
+                  <span>N° RIF</span>
+                  <input className="input" value={form.rif} onChange={setField('rif')} required />
+                </label>
+              </div>
+              <div className="field-row">
+                <label className="field-label">
+                  <span>Teléfonos de la empresa</span>
+                  <input className="input" value={form.telefonoEmpresa} onChange={setField('telefonoEmpresa')} />
+                </label>
+                <label className="field-label">
+                  <span>Cargo desempeñado</span>
+                  <input className="input" value={form.cargo} onChange={setField('cargo')} />
+                </label>
+              </div>
+              <label className="field-label">
+                <span>Dirección Fiscal</span>
+                <input className="input" value={form.direccionFiscal} onChange={setField('direccionFiscal')} />
+              </label>
+              <label className="field-label">
+                <span>Dirección Oficina (envío de factura)</span>
+                <input className="input" value={form.direccionOficina} onChange={setField('direccionOficina')} />
+              </label>
+              <div className="field-row">
+                <label className="field-label">
+                  <span>Persona contacto recepción factura</span>
+                  <input className="input" value={form.contactoFacturaNombre} onChange={setField('contactoFacturaNombre')} />
+                </label>
+                <label className="field-label">
+                  <span>Correo (contacto factura)</span>
+                  <input type="email" className="input" value={form.contactoFacturaEmail} onChange={setField('contactoFacturaEmail')} />
+                </label>
+              </div>
+              <div className="field-row">
+                <label className="field-label">
+                  <span>Persona responsable de la inscripción</span>
+                  <input className="input" value={form.responsableNombre} onChange={setField('responsableNombre')} />
+                </label>
+                <label className="field-label">
+                  <span>Tel. f. responsable</span>
+                  <input className="input" value={form.responsableTelefono} onChange={setField('responsableTelefono')} />
+                </label>
+              </div>
+            </div>
+          )}
+
+          <label className="field-label">
+            <span>¿Cómo se enteró del evento?</span>
+            <select className="input" value={form.comoSeEntero} onChange={setField('comoSeEntero')}>
+              <option value="">Seleccione...</option>
+              <option value="promocion">Promoción</option>
+              <option value="correo">E-mail</option>
+              <option value="redes">RRSS</option>
+              <option value="internet">Internet</option>
+              <option value="referidos">Referidos</option>
+              <option value="otro">Otro</option>
+            </select>
+          </label>
+          {form.comoSeEntero === 'otro' && (
+            <label className="field-label">
+              <span>Especifique</span>
+              <input className="input" value={form.comoSeEnteroOtro} onChange={setField('comoSeEnteroOtro')} placeholder="Otro" />
+            </label>
+          )}
+        </div>
 
         <div className="price-bar">
           <span>{t('insc.total')} {countParticipants > 1 ? `(${countParticipants} participantes)` : ''}</span>

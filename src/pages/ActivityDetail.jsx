@@ -2,8 +2,8 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { FaArrowLeft, FaCalendarDay, FaClock, FaUserGraduate, FaUsers, FaSackDollar, FaBullseye, FaListUl, FaChalkboardUser, FaUserCheck, FaLocationDot } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
-import { useActivity, useAffiliationConfig } from '../data/useData'
-import { calcularPrecioInscripcion } from '../data/pricing'
+import { useActivity, useAffiliationConfig, useMyInscriptions } from '../data/useData'
+import { calcularPrecioInscripcion, tipoAsistenteEn } from '../data/pricing'
 import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
 import { CURRENCY } from '../config'
@@ -14,7 +14,14 @@ export default function ActivityDetail() {
   const { user, profile } = useAuth()
   const { item, loading } = useActivity(id)
   const { config: affConfig } = useAffiliationConfig()
-  const pricing = calcularPrecioInscripcion({ precio: item?.precio, profile, config: affConfig, actividad: item })
+  const { items: misInscripciones } = useMyInscriptions(user?.uid)
+  const pricing = calcularPrecioInscripcion({
+    precio: item?.precio,
+    profile,
+    config: affConfig,
+    actividad: item,
+    tipoAsistente: tipoAsistenteEn(misInscripciones, id)
+  })
   const navigate = useNavigate()
 
   if (loading) return <div className="page"><div className="loading">{t('cat.loading')}</div></div>

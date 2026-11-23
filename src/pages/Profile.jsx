@@ -18,6 +18,7 @@ import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
 import { useMyInscriptions, useMyFacturas, useActivities, useUserCertificates, uploadComprobante } from '../data/useData'
 import SurveyModal from '../components/SurveyModal'
+import UserQuestions from '../components/UserQuestions'
 import { formatDate } from '../components/ActivityCard'
 import { CURRENCY } from '../config'
 import { fileToStorable } from '../utils/files'
@@ -199,7 +200,8 @@ export default function Profile() {
       contactoFacturaEmail: profile?.contactoFacturaEmail || '',
       responsableNombre: profile?.responsableNombre || '',
       responsableTelefono: profile?.responsableTelefono || '',
-      comoSeEntero: profile?.comoSeEntero || ''
+      comoSeEntero: profile?.comoSeEntero || '',
+      perfilAsistente: profile?.perfilAsistente || 'asistente'
     })
     setSaved(false)
     setEditing(true)
@@ -388,6 +390,20 @@ export default function Profile() {
                 )}
               </div>
               {reading && <p className="receipt-hint">{t('profile.readingFile')}</p>}
+            </div>
+
+            <div className="field-label">
+              <span>Tipo de participante / rol en la organización</span>
+              <select
+                className="input"
+                value={form.perfilAsistente || 'asistente'}
+                onChange={(e) => setForm({ ...form, perfilAsistente: e.target.value })}
+              >
+                <option value="asistente">Asistente</option>
+                <option value="junta">Junta Directiva</option>
+                <option value="facilitador">Facilitador</option>
+              </select>
+              <em>Esto permite al sistema identificarlo más fácilmente al inscribirlo en eventos, cursos o talleres.</em>
             </div>
 
             {profile?.tipoPersona === 'juridico' && (
@@ -627,6 +643,9 @@ export default function Profile() {
           </section>
         )
       })()}
+
+      {/* Preguntas en vivo */}
+      <UserQuestions actividades={actividades} inscripciones={inscripciones} />
 
       {/* Certificados emitidos */}
       <section className="panel">

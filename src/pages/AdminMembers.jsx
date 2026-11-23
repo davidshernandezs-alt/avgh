@@ -254,8 +254,9 @@ export default function AdminMembers() {
       </section>
 
       {row && (
-        <section className="panel admin-detail">
-          <div className="admin-detail-head">
+        <div className="qr-modal-backdrop admin-review-backdrop" onClick={() => setSelected(null)}>
+          <section className="panel admin-detail" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-detail-head">
             <h3>{t('admin.view')} — {clientName(row)}</h3>
             <button className="btn-icon" onClick={() => setSelected(null)} aria-label={t('admin.close')}>
               <FaXmark />
@@ -391,7 +392,8 @@ export default function AdminMembers() {
               </div>
             </div>
           </div>
-        </section>
+          </section>
+        </div>
       )}
     </>
   )

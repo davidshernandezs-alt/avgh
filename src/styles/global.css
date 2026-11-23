@@ -1171,8 +1171,10 @@ textarea {
 }
 
 .detail-cover {
-  height: 180px;
-  max-width: calc(100% - 32px);
+  width: calc(100% - 32px);
+  max-width: 900px;
+  aspect-ratio: 16 / 9;
+  height: auto;
   margin: 16px auto 0;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -1180,6 +1182,14 @@ textarea {
   place-items: center;
   color: #fff;
   box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 760px) {
+  .detail-cover {
+    width: calc(100% - 24px);
+    aspect-ratio: 4 / 3;
+    margin-top: 12px;
+  }
 }
 
 .detail-cover-letter {
@@ -1753,6 +1763,67 @@ textarea {
 
 .survey-metric small { color: var(--muted); font-size: 11px; }
 
+/* ============ Q&A EN VIVO ============ */
+.question-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.qa-list .list-item { align-items: flex-start; }
+.qa-list .list-main > span:first-child { font-weight: 600; line-height: 1.4; }
+.qa-answered { opacity: 0.65; }
+.qa-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+
+.qa-stage {
+  background: var(--navy);
+  min-height: 75vh;
+  border-radius: var(--radius);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: #fff;
+}
+
+.qa-stage-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.qa-stage-event { color: var(--gold); font-weight: 700; }
+
+.qa-stage-card {
+  flex: 1 1 auto;
+  background: #fff;
+  color: var(--navy);
+  border-radius: var(--radius);
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.qa-stage-label {
+  font-size: 14px;
+  letter-spacing: 4px;
+  font-weight: 800;
+  color: var(--red);
+}
+
+.qa-stage-card h2 { font-size: 38px; line-height: 1.3; max-width: 1000px; }
+.qa-stage-author { font-size: 16px; color: var(--muted); }
+
+.qa-stage-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+
+@media (max-width: 760px) {
+  .qa-stage-card { padding: 24px; }
+  .qa-stage-card h2 { font-size: 24px; }
+  .qa-actions { justify-content: flex-start; }
+}
+
 /* ============ TOGGLE / SUICHE ============ */
 .toggle-row {
   display: flex;
@@ -1927,7 +1998,8 @@ textarea {
 .detail-cover-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--bg);
 }
 
 .detail-block {
@@ -3227,6 +3299,55 @@ textarea {
   padding: 0 20px 20px;
 }
 
+.admin-review-backdrop .admin-detail {
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: 0;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.admin-review-backdrop .admin-detail-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--card);
+}
+
+@media (max-width: 760px) {
+  .admin-review-backdrop .admin-detail {
+    max-height: 94vh;
+  }
+}
+
+/* ============ FORMULARIO DE INSCRIPCIÓN ============ */
+.insc-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+}
+
+.insc-form-section .detail-section-title {
+  margin: 0 0 4px;
+  color: var(--navy);
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.insc-company-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
 /* ============ CERTIFICADO / CERTIFICATE ============ */
 
 .certificate-modal {
@@ -3298,8 +3419,8 @@ textarea {
 .certificate-page-alt {
   page-break-after: auto;
   width: min(780px, 100%);
-  aspect-ratio: 4 / 3;
-  min-height: 0;
+  min-height: 520px;
+  height: auto;
   background-image: url('../assets/certificado-fondo-anverso.jpg');
   background-size: contain;
   background-repeat: no-repeat;
@@ -3312,9 +3433,10 @@ textarea {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 5px;
-  padding: 30px 40px 24px;
+  gap: 6px;
+  padding: 40px 44px 46px;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 .certificate-page-alt .certificate-kicker {
