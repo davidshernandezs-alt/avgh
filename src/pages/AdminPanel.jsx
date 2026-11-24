@@ -59,6 +59,7 @@ import TicketModal from '../components/TicketModal'
 import CertificateModal from '../components/CertificateModal'
 import AdminQuestions from '../components/AdminQuestions'
 import Toggle from '../components/Toggle'
+import { importarExcelInscritos } from '../data/excelImport'
 
 const paymentLabels = {
   transfer: 'insc.payment.transfer',
@@ -791,6 +792,7 @@ function InscribedTab() {
   const [filterAct, setFilterAct] = useState('')
   const [uploadMsg, setUploadMsg] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [updateExisting, setUpdateExisting] = useState(false)
   const [affPlan, setAffPlan] = useState({})
   const [certRow, setCertRow] = useState(null)
   const excelInputRef = useRef(null)
@@ -845,24 +847,25 @@ function InscribedTab() {
   const downloadTemplate = () => {
     const data = [
       {
-        nombres: 'ALMER',
-        apellidos: 'BRACAMONTE',
-        dni: '11926888',
-        email: 'almer.bracamonte@gmail.com',
-        tipoAsistente: 'regular'
-      },
-      {
-        nombres: 'RAQUEL',
-        apellidos: 'HERRERA',
-        dni: '10382857',
-        email: 'raherrera71@gmail.com',
-        tipoAsistente: 'regular'
+        'FECHA DE INSCRIPCION': '',
+        FACTURA: '',
+        PAGOS: 'PAGADO',
+        CATEGORIA: 'NO AFILIADO',
+        'Cantidad de participantes': 1,
+        NOMBRE: 'ALMER',
+        'NOMBRE APELLIDOS': 'BRACAMONTE',
+        CI: '11926888',
+        EMPRESA: 'AVGH',
+        CARGO: 'PRESIDENTE',
+        CORREO: 'almer.bracamonte@gmail.com',
+        TELEFONO: '04145551234',
+        OBSERVACIONES: 'Afiliado individual / corporativo / junta / facilitador'
       }
     ]
     const worksheet = XLSX.utils.json_to_sheet(data)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Plantilla Inscritos')
-    XLSX.writeFile(workbook, 'Plantilla_Inscritos_AVGH.csv', { bookType: 'csv' })
+    XLSX.writeFile(workbook, 'Plantilla_Inscritos_AVGH.xlsx')
   }
 
   const handleExcelUpload = async (e) => {
@@ -886,97 +889,31 @@ function InscribedTab() {
 
     try {
       const arrayBuffer = await file.arrayBuffer()
-      let jsonRows = []
+      const result = await importarExcelInscritos({
+        arrayBuffer,
+        actividad: selectedAct,
+        actualizarExistentes: updateExisting,
+        onProgress: (m) => setUploadMsg(m)
+      })
 
-      // Intentar leer con XLSX (soporta .xlsx, .xls y .csv automáticamente)
-      try {
-        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' })
-        const firstSheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[firstSheetName]
-        jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
-      } catch {
-        // Fallback como texto plano CSV / TSV
-        const text = new TextDecoder().decode(arrayBuffer)
-        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-        if (lines.length > 0) {
-          const firstLine = lines[0]
-          const separator = firstLine.includes('\t') ? '\t' : firstLine.includes(';') ? ';' : ','
-          const headers = firstLine.split(separator).map(h => h.replace(/^["'\uFEFF]|["']$/g, '').trim().toLowerCase())
-          
-          for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].split(separator).map(c => c.replace(/^["']|["']$/g, '').trim())
-            const rowObj = {}
-            headers.forEach((h, idx) => {
-              rowObj[h] = cols[idx] || ''
-            })
-            jsonRows.push(rowObj)
-          }
-        }
-      }
-
-      if (!jsonRows || jsonRows.length === 0) {
-        setUploadMsg('El archivo está vacío o no se pudieron leer filas.')
-        setUploading(false)
-        return
-      }
-
-      let count = 0
-      for (const row of jsonRows) {
-        // Buscar campos sin importar mayúsculas, minúsculas o variaciones
-        const keys = Object.keys(row)
-        const findKey = (terms) => {
-          const found = keys.find(k => terms.some(t => k.toLowerCase().includes(t)))
-          return found ? String(row[found] || '').trim() : ''
-        }
-
-        const nombres = findKey(['nombre', 'nombres'])
-        const apellidos = findKey(['apellido', 'apellidos'])
-        const dni = findKey(['dni', 'cedula', 'cédula', 'documento', 'ci'])
-        const email = findKey(['email', 'correo', 'mail'])
-        const rawTipo = findKey(['tipo', 'asistente']).toLowerCase()
-        const tipoAsistente = rawTipo.includes('invitad')
-          ? 'invitado'
-          : rawTipo.includes('exonerad')
-            ? 'exonerado'
-            : rawTipo.includes('facilitad')
-              ? 'facilitador'
-              : rawTipo.includes('junta')
-                ? 'junta'
-                : rawTipo.includes('noafiliad')
-                  ? 'noafiliado'
-                  : rawTipo.includes('afiliad')
-                    ? 'afiliado'
-                    : 'regular'
-
-        if (nombres && dni) {
-          const fakeUid = `import_${Date.now()}_${Math.floor(Math.random() * 10000)}`
-          const fakeUser = {
-            nombres,
-            apellidos,
-            dni,
-            email: email || `${dni}@avgh.local`
-          }
-          await createInscription({
-            uid: fakeUid,
-            actividad: selectedAct,
-            user: fakeUser,
-            metodoPago: 'cash',
-            estado: 'confirmada',
-            tipoAsistente,
-            presente: false
-          })
-          count++
-        }
-      }
-
-      if (count === 0) {
-        setUploadMsg('No se encontraron registros válidos (se requiere al menos nombre y cédula/dni por fila).')
+      const ok = result.created.length
+      const upd = result.actualizados?.length || 0
+      const ya = result.yaInscritos?.length || 0
+      const conCorreo = result.created.filter((p) => p.email).length
+      const err = result.errores.length ? ` · ${result.errores.length} con error` : ''
+      const detalle = [
+        ok ? `${ok} inscritos registrados en "${localize(selectedAct.titulo, lang)}" · ${conCorreo} con correo · clave = cédula` : '',
+        upd ? `${upd} actualizados (misma factura)` : '',
+        ya ? `${ya} ya inscritos (omitidos, sin factura nueva)` : ''
+      ].filter(Boolean).join(' · ')
+      if (!detalle) {
+        setUploadMsg(`No se registraron inscritos. ${result.errores.slice(0, 2).join(' ')}`)
       } else {
-        setUploadMsg(`✅ ¡Éxito! Se registraron ${count} inscritos en el evento "${localize(selectedAct.titulo, lang)}".`)
+        setUploadMsg(`✅ ${detalle}${err}`)
       }
     } catch (err) {
       console.error(err)
-      setUploadMsg('Error al leer el archivo. Verifica el formato.')
+      setUploadMsg(`Error al importar: ${err?.message || 'Verifica el formato.'}`)
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -1011,6 +948,19 @@ function InscribedTab() {
       <p className="auth-hint">
         Consulta o carga masivamente participantes desde un archivo Excel seleccionando primero el curso/evento objetivo.
       </p>
+
+      <label className="checkbox" style={{ marginBottom: '14px' }}>
+        <input
+          type="checkbox"
+          checked={updateExisting}
+          onChange={(e) => setUpdateExisting(e.target.checked)}
+        />
+        <span>
+          Actualizar inscritos existentes: reutiliza su factura (mismo número, sin crear una nueva) y actualiza su
+          inscripción, afiliación y datos con los del Excel. No revierte pagos ya validados ni asistencia registrada.
+          Sin marcar, los que ya estén inscritos se omiten.
+        </span>
+      </label>
 
       {uploadMsg && (
         <div className="form-success" style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '6px' }}>

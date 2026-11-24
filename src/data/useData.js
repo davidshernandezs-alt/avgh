@@ -205,15 +205,25 @@ export async function createInscription({
   afiliado = null,
   planAfiliacion = '',
   facturacion = null,
-  listaEspera = false
+  listaEspera = false,
+  reutilizar = null
 }) {
   if (!uid) throw new Error('UID de usuario ausente')
   if (!actividad?.id) throw new Error('ID de actividad ausente')
 
-  const facturaId = 'FAC_' + Math.random().toString(36).substring(2, 9)
-  const numeroFactura = `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-  const fecha = Date.now()
+  // Modo actualización: conserva la factura original (mismo id y número) y los
+  // datos que no vienen en el Excel, en lugar de generar una factura nueva.
+  const inscOld = reutilizar?.inscripcion || null
+  const facOld = reutilizar?.factura || null
+  const facturaId = facOld?.facturaId || inscOld?.facturaId || 'FAC_' + Math.random().toString(36).substring(2, 9)
+  const numeroFactura = facOld?.numero || `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+  const fecha = inscOld?.fecha || facOld?.fecha || Date.now()
   const montoFinal = monto !== undefined && monto !== null ? Number(monto) || 0 : Number(actividad.precio) || 0
+  const desgloseFinal = desglose || inscOld?.desglose || null
+  const facturacionFinal = facturacion || facOld?.facturacion || null
+  const yaCompletada = facOld?.estado === 'completada'
+  const estadoFactura = estado === 'confirmada' || yaCompletada ? 'completada' : 'pendiente'
+  const validadaFecha = estadoFactura === 'completada' ? facOld?.validadaFecha || fecha : null
 
   const inscripcion = {
     fecha,
@@ -222,11 +232,11 @@ export async function createInscription({
     metodoPago,
     monto: montoFinal,
     facturaId,
-    presente: false,
+    presente: inscOld?.presente === true,
     user: user && typeof user === 'object' ? user : {},
     ...(afiliado !== null ? { afiliado } : {}),
     ...(planAfiliacion ? { planAfiliacion } : {}),
-    ...(desglose ? { desglose } : {})
+    ...(desgloseFinal ? { desglose: desgloseFinal } : {})
   }
 
   const tituloAct = actividad.titulo
@@ -241,18 +251,18 @@ export async function createInscription({
     monto: montoFinal,
     fecha,
     metodo: metodoPago,
-    estado: estado === 'confirmada' ? 'completada' : 'pendiente',
-    validadaFecha: estado === 'confirmada' ? fecha : null,
-    ...(desglose
+    estado: estadoFactura,
+    validadaFecha,
+    ...(desgloseFinal
       ? {
-          precioBase: desglose.precioBase,
-          descuentoPorcentaje: desglose.descuentoPorcentaje,
-          descuentoMonto: desglose.descuentoMonto
+          precioBase: desgloseFinal.precioBase,
+          descuentoPorcentaje: desgloseFinal.descuentoPorcentaje,
+          descuentoMonto: desgloseFinal.descuentoMonto
         }
       : {}),
     ...(afiliado !== null ? { afiliado } : {}),
     ...(planAfiliacion ? { planAfiliacion } : {}),
-    ...(facturacion ? { facturacion } : {}),
+    ...(facturacionFinal ? { facturacion: facturacionFinal } : {}),
     ...(listaEspera ? { listaEspera: true, estado: 'lista_espera' } : {})
   }
 
