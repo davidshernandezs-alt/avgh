@@ -100,6 +100,7 @@ function RequestsTab() {
   const [msg, setMsg] = useState('')
   const [showTicket, setShowTicket] = useState(false)
   const [filterEstado, setFilterEstado] = useState('pendiente')
+  const [sortBy, setSortBy] = useState('nombre-asc')
 
   const countsEstado = useMemo(() => ({
     pendiente: rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera').length,
@@ -109,11 +110,17 @@ function RequestsTab() {
   }), [rows])
 
   const filteredRequests = useMemo(() => {
-    if (filterEstado === 'all') return rows
-    if (filterEstado === 'pendiente') return rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera')
-    if (filterEstado === 'aprobada') return rows.filter((r) => r.estado === 'confirmada' || r.estado === 'completada' || r.estado === 'confirmed')
-    return rows.filter((r) => r.estado === filterEstado)
-  }, [rows, filterEstado])
+    let out = rows
+    if (filterEstado === 'pendiente') out = rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera')
+    else if (filterEstado === 'aprobada') out = rows.filter((r) => r.estado === 'confirmada' || r.estado === 'completada' || r.estado === 'confirmed')
+    else if (filterEstado === 'rechazada') out = rows.filter((r) => r.estado === 'rechazada')
+    const nameOf = (r) => `${r.user?.nombres || ''} ${r.user?.apellidos || ''}`.trim()
+    return [...out].sort((a, b) => {
+      if (sortBy === 'nombre-desc') return nameOf(b).localeCompare(nameOf(a), 'es')
+      if (sortBy === 'recientes') return (b.fecha || 0) - (a.fecha || 0)
+      return nameOf(a).localeCompare(nameOf(b), 'es')
+    })
+  }, [rows, filterEstado, sortBy])
 
   const actById = useMemo(() => {
     const m = {}
@@ -201,6 +208,17 @@ function RequestsTab() {
                 {label}
               </button>
             ))}
+            <select
+              className="input"
+              style={{ maxWidth: '190px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Ordenar solicitudes"
+            >
+              <option value="nombre-asc">Orden: Nombre A-Z</option>
+              <option value="nombre-desc">Orden: Nombre Z-A</option>
+              <option value="recientes">Orden: Más recientes</option>
+            </select>
           </div>
         </div>
 

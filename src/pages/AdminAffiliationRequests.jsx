@@ -153,6 +153,7 @@ export default function AdminAffiliationRequests() {
   const { user } = useAuth()
   const { items, loading, error } = useAffiliationRequests()
   const [filter, setFilter] = useState('pendiente')
+  const [sortBy, setSortBy] = useState('nombre-asc')
   const [selectedUid, setSelectedUid] = useState(null)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -172,10 +173,17 @@ export default function AdminAffiliationRequests() {
   )
 
   const filtered = useMemo(() => {
-    if (filter === 'all') return items
-    if (filter === 'pendiente') return items.filter((item) => item.estado === 'pendiente' || item.estado === 'borrador')
-    return items.filter((item) => item.estado === filter)
-  }, [items, filter])
+    let out = items
+    if (filter === 'pendiente') out = items.filter((item) => item.estado === 'pendiente' || item.estado === 'borrador')
+    else if (filter !== 'all') out = items.filter((item) => item.estado === filter)
+    const nameOf = (i) => `${i.user?.nombres || ''} ${i.user?.apellidos || ''} ${i.nombreEmpresa || i.razonSocial || i.email || ''}`.trim()
+    out = [...out].sort((a, b) => {
+      if (sortBy === 'nombre-desc') return nameOf(b).localeCompare(nameOf(a), 'es')
+      if (sortBy === 'recientes') return (b.fecha || b.fechaRegistro || 0) - (a.fecha || a.fechaRegistro || 0)
+      return nameOf(a).localeCompare(nameOf(b), 'es')
+    })
+    return out
+  }, [items, filter, sortBy])
 
   const openRequest = (item) => {
     setSelectedUid(item.uid)
@@ -280,6 +288,17 @@ export default function AdminAffiliationRequests() {
                 {label}
               </button>
             ))}
+            <select
+              className="input"
+              style={{ maxWidth: '190px' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Ordenar solicitudes de afiliación"
+            >
+              <option value="nombre-asc">Orden: Nombre A-Z</option>
+              <option value="nombre-desc">Orden: Nombre Z-A</option>
+              <option value="recientes">Orden: Más recientes</option>
+            </select>
           </div>
         </div>
 
