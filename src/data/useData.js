@@ -206,7 +206,8 @@ export async function createInscription({
   planAfiliacion = '',
   facturacion = null,
   listaEspera = false,
-  reutilizar = null
+  reutilizar = null,
+  numeroFactura = null
 }) {
   if (!uid) throw new Error('UID de usuario ausente')
   if (!actividad?.id) throw new Error('ID de actividad ausente')
@@ -216,7 +217,7 @@ export async function createInscription({
   const inscOld = reutilizar?.inscripcion || null
   const facOld = reutilizar?.factura || null
   const facturaId = facOld?.facturaId || inscOld?.facturaId || 'FAC_' + Math.random().toString(36).substring(2, 9)
-  const numeroFactura = facOld?.numero || `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+  const numeroFacturaFinal = facOld?.numero || numeroFactura || `FAC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
   const fecha = inscOld?.fecha || facOld?.fecha || Date.now()
   const montoFinal = monto !== undefined && monto !== null ? Number(monto) || 0 : Number(actividad.precio) || 0
   const desgloseFinal = desglose || inscOld?.desglose || null
@@ -245,7 +246,7 @@ export async function createInscription({
     : (tituloAct || 'Curso / Evento')
 
   const factura = {
-    numero: numeroFactura,
+    numero: numeroFacturaFinal,
     actividadId: actividad.id,
     concepto,
     monto: montoFinal,
@@ -272,7 +273,7 @@ export async function createInscription({
 
   await update(ref(db), updates)
 
-  return { facturaId, numeroFactura, monto: montoFinal, desglose }
+  return { facturaId, numeroFactura: numeroFacturaFinal, monto: montoFinal, desglose }
 }
 
 export async function fetchActividad(id) {
@@ -1050,6 +1051,23 @@ export async function deleteInscription(uid, actividadId) {
 
 export async function deleteInvoice(uid, facturaId) {
   await remove(ref(db, `${DB_ROOT}/facturas/${uid}/${facturaId}`))
+}
+
+// Elimina varias inscripciones y sus facturas en una sola operación atómica.
+// Cada item debe traer uid y, según lo que se quiera borrar, actividadId
+// (inscripción) y facturaId (factura). Se usa tanto desde Inscritos como desde
+// Facturas para no tener que eliminar uno por uno.
+export async function deleteInscriptionsAndInvoicesBulk(items) {
+  const updates = {}
+  for (const it of items || []) {
+    const uid = it?.uid
+    if (!uid) continue
+    if (it.actividadId) updates[`${DB_ROOT}/inscripciones/${uid}/${it.actividadId}`] = null
+    if (it.facturaId) updates[`${DB_ROOT}/facturas/${uid}/${it.facturaId}`] = null
+  }
+  if (!Object.keys(updates).length) return 0
+  await update(ref(db, '/'), updates)
+  return (items || []).length
 }
 
 export async function deleteUserAccount(uid) {

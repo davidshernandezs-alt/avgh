@@ -429,7 +429,7 @@ const es = {
   'admin.saving': 'Guardando...',
 
   'admin.metric.users': 'Usuario',
-  'admin.metric.courses': 'Inscritos en cursos, talleres o eventos',
+  'admin.metric.courses': 'Cursos, diplomados y congresos activos',
   'admin.metric.inscriptions': 'Pagadas y confirmadas',
   'banner.install': 'Instalar',
   'banner.enableNotifications': '🔔 Activar notificaciones',

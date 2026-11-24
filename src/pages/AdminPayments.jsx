@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FaSackDollar, FaFileInvoice, FaTrash, FaCheck } from 'react-icons/fa6'
 import { useLang } from '../i18n'
-import { useAllFacturas, deleteInvoice, setInscripcionEstado } from '../data/useData'
+import { useAllFacturas, deleteInvoice, setInscripcionEstado, deleteInscriptionsAndInvoicesBulk } from '../data/useData'
 import { ref, update } from 'firebase/database'
 import { db, DB_ROOT } from '../firebase'
 import { formatDate } from '../components/ActivityCard'
@@ -63,6 +63,9 @@ export default function AdminPayments() {
   const { rows, loading, error } = useAllFacturas()
   const [week, setWeek] = useState('all')
   const [month, setMonth] = useState('all')
+  const [selected, setSelected] = useState({})
+  const [deleting, setDeleting] = useState(false)
+  const [bulkMsg, setBulkMsg] = useState('')
 
   const removeInvoice = async (uid, facturaId) => {
     if (!window.confirm('¿Eliminar esta factura definitivamente?')) return
@@ -112,6 +115,42 @@ export default function AdminPayments() {
     (r) => r.factura?.fecha && inWeek(r.factura.fecha) && inMonth(r.factura.fecha)
   )
   const total = filtered.reduce((s, r) => s + (Number(r.factura.monto) || 0), 0)
+
+  const rowKey = (r) => `${r.uid}__${r.facturaId}`
+  const selectedRows = filtered.filter((r) => selected[rowKey(r)])
+  const allSelected = filtered.length > 0 && selectedRows.length === filtered.length
+
+  const toggleAll = () => {
+    if (allSelected) setSelected({})
+    else setSelected(Object.fromEntries(filtered.map((r) => [rowKey(r), true])))
+  }
+
+  const toggleOne = (r) => {
+    const key = rowKey(r)
+    setSelected((prev) => {
+      const next = { ...prev }
+      if (next[key]) delete next[key]
+      else next[key] = true
+      return next
+    })
+  }
+
+  const bulkDelete = async () => {
+    if (!selectedRows.length) return
+    if (!window.confirm(`¿Eliminar ${selectedRows.length} factura(s) y su inscripción vinculada? Esta acción no se puede deshacer.`)) return
+    setDeleting(true)
+    setBulkMsg('')
+    try {
+      const n = await deleteInscriptionsAndInvoicesBulk(selectedRows)
+      setSelected({})
+      setBulkMsg(`✅ Se eliminaron ${n} registros (factura e inscripción).`)
+    } catch (err) {
+      console.error(err)
+      alert(`Error al eliminar: ${err?.message || 'intenta de nuevo'}`)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const byMonth = useMemo(() => {
     const m = new Map()
@@ -199,6 +238,19 @@ export default function AdminPayments() {
           <FaFileInvoice />
           <h3>{t('admin.paymentsTitle')}</h3>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', padding: '10px 12px', background: '#f4f6fb', borderRadius: '6px' }}>
+          <label className="checkbox" style={{ margin: 0 }}>
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={!filtered.length || deleting} />
+            <span>Seleccionar todos los filtrados ({filtered.length})</span>
+          </label>
+          <span style={{ fontSize: '13px', color: '#555' }}>{selectedRows.length} seleccionado(s)</span>
+          <button className="btn btn-danger btn-sm" onClick={bulkDelete} disabled={!selectedRows.length || deleting}>
+            <FaTrash /> {deleting ? 'Eliminando...' : 'Eliminar seleccionados (factura + inscripción)'}
+          </button>
+        </div>
+        {bulkMsg && (
+          <div className="form-success" style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '6px' }}>{bulkMsg}</div>
+        )}
         {loading ? (
           <div className="loading">{t('cat.loading')}</div>
         ) : filtered.length === 0 ? (
@@ -208,6 +260,9 @@ export default function AdminPayments() {
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th style={{ width: '36px' }}>
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Seleccionar todas" />
+                  </th>
                   <th>{t('admin.payments.date')}</th>
                   <th>{t('admin.payments.payer')}</th>
                   <th>{t('admin.payments.course')}</th>
@@ -227,6 +282,14 @@ export default function AdminPayments() {
                   const isPdf = r.factura.comprobante?.startsWith('data:application/pdf')
                   return (
                     <tr key={`${r.uid}-${r.facturaId}`}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selected[rowKey(r)])}
+                          onChange={() => toggleOne(r)}
+                          aria-label={`Seleccionar factura ${r.factura.numero || ''}`}
+                        />
+                      </td>
                       <td>{formatDate(r.factura.fecha, lang)}</td>
                       <td>
                         <div className="admin-student">

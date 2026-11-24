@@ -24,10 +24,53 @@ function excelDateToTs(value) {
 
 const norm = (v) => String(v ?? '').trim()
 const lower = (v) => norm(v).toLowerCase()
+// Normalización fuerte: quita espacios, puntos, guiones y acentos.
+// "FECHA DE INSCRIPCIÓN" => "fechadeinscripcion"
+const keyOf = (v) => lower(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
+
+// Campos canónicos de la planilla de la jornada. Se buscan por NOMBRE de
+// columna (normalizado), no por posición, para que cualquier orden funcione:
+// FACTURA, PAGOS, CATEGORIA, NOMBRE, APELLIDOS, CI, EMPRESA, CARGO, CORREO, TELEFONO.
+const CANON = {
+  fecha: ['fechadeinscripcion', 'fechainscripcion', 'fecha'],
+  factura: ['factura'],
+  pago: ['pago', 'pagos', 'estatuspago', 'estatus', 'estado'],
+  categoria: ['categoria', 'tipo'],
+  nombres: ['nombre', 'nombres'],
+  apellidos: ['apellidos', 'apellido', 'nombreapellidos'],
+  ci: ['ci', 'cedula', 'dni', 'documento'],
+  empresa: ['empresa', 'compania'],
+  cargo: ['cargo'],
+  correo: ['correo', 'email', 'mail'],
+  telefono: ['telefono', 'celular', 'wts', 'whatsapp', 'telf']
+}
+
+const findCol = (headers, terms) => {
+  const keys = headers.map(keyOf)
+  // 1) coincidencia exacta (normalizada)
+  for (const term of terms) {
+    const k = keyOf(term)
+    if (!k) continue
+    const i = keys.indexOf(k)
+    if (i >= 0) return i
+  }
+  // 2) coincidencia por contenido, evitando términos cortos como "ci"
+  for (const term of terms) {
+    const k = keyOf(term)
+    if (k.length < 4) continue
+    const i = keys.findIndex((h) => h && h.includes(k))
+    if (i >= 0) return i
+  }
+  return -1
+}
 
 // Mapea la CATEGORÍA del Excel a tipoAsistente + datos de afiliación.
 export function mapCategoria(cat) {
   const c = lower(cat)
+  // "NO AFILIADO" debe evaluarse ANTES que "AFILIADO" (si no, coincide con este último).
+  if (c.includes('no afiliado') || c.includes('noafiliado') || c.includes('noafiliad')) {
+    return { tipoAsistente: 'regular', afiliado: false, planAfiliacion: '', perfilAsistente: 'asistente' }
+  }
   if (c.includes('corporativo')) {
     return { tipoAsistente: 'afiliado', afiliado: true, planAfiliacion: 'corporativo', perfilAsistente: 'asistente' }
   }
@@ -36,9 +79,6 @@ export function mapCategoria(cat) {
   }
   if (c.includes('afiliado')) {
     return { tipoAsistente: 'afiliado', afiliado: true, planAfiliacion: 'individual', perfilAsistente: 'asistente' }
-  }
-  if (c.includes('no afiliado') || c.includes('noafiliado')) {
-    return { tipoAsistente: 'regular', afiliado: false, planAfiliacion: '', perfilAsistente: 'asistente' }
   }
   if (c.includes('junta')) {
     return { tipoAsistente: 'junta', afiliado: true, planAfiliacion: 'corporativo', perfilAsistente: 'junta' }
@@ -55,68 +95,55 @@ export function mapCategoria(cat) {
   return { tipoAsistente: 'regular', afiliado: false, planAfiliacion: '', perfilAsistente: 'asistente' }
 }
 
-const findCol = (headers, terms) => {
-  // Para términos cortos como "ci", exigir coincidencia exacta para no
-  // capturar "FECHA DE INSCRIPCION" (que contiene "ci").
-  const exact = ['ci', 'dni', 'cedula', 'cédula', 'documento', 'correo', 'email', 'mail', 'empresa', 'cargo', 'telefono', 'teléfono', 'wts', 'whatsapp', 'celular', 'categoria', 'categoría', 'tipo', 'pago', 'pagos', 'estatus', 'estado', 'nombre', 'nombres', 'apellido', 'apellidos']
-  for (const term of terms) {
-    const t = lower(term)
-    if (exact.includes(t)) {
-      const i = headers.findIndex((h) => lower(h) === t)
-      if (i >= 0) return i
-    }
-  }
-  const idx = headers.findIndex((h) => terms.some((t) => lower(h).includes(lower(t))))
-  return idx >= 0 ? idx : -1
-}
-
-// Extrae filas de una hoja: detecta la fila de encabezados y mapea a objeto.
+// Extrae filas de una hoja: detecta la fila de encabezados (puede haber títulos
+// encima, como en las hojas "JUNTA..." y "PATROCINANTES...") y conserva los
+// valores en un array para leerlos por índice de columna.
 function sheetRows(worksheet) {
   const all = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
   if (!all.length) return []
 
-  // Buscar fila de encabezados (la que contenga NOMBRE y CI/CEDULA)
   let headerIdx = -1
-  for (let i = 0; i < Math.min(all.length, 8); i++) {
-    const row = all[i].map(norm)
-    if (row.some((h) => lower(h).includes('nombre')) && row.some((h) => /^(ci|cedula|cédula|dni|documento)$/i.test(lower(h)) || lower(h).includes('cedula'))) {
+  for (let i = 0; i < Math.min(all.length, 12); i++) {
+    const keys = (all[i] || []).map(keyOf)
+    const tieneNombre = keys.some((k) => CANON.nombres.some((t) => keyOf(t) === k))
+    const tieneDato = keys.some((k) =>
+      [...CANON.apellidos, ...CANON.ci, ...CANON.correo, ...CANON.telefono].some((t) => keyOf(t) === k)
+    )
+    if (tieneNombre && tieneDato) {
       headerIdx = i
       break
     }
   }
-  // Formato plantilla simple (primera fila = headers nombres/apellidos/dni)
-  if (headerIdx < 0 && all[0].some((h) => lower(h).includes('nombre'))) headerIdx = 0
   if (headerIdx < 0) return []
 
-  const headers = all[headerIdx].map(norm)
+  const headers = (all[headerIdx] || []).map(norm)
   const out = []
   for (let i = headerIdx + 1; i < all.length; i++) {
-    const r = all[i]
-    if (!r || r.every((v) => !norm(v))) continue
-    const row = {}
-    headers.forEach((h, j) => { if (h) row[h] = r[j] })
-    out.push({ row, headers })
+    const values = all[i] || []
+    if (values.every((v) => !norm(v))) continue
+    out.push({ headers, values })
   }
   return out
 }
 
-function normalizarFila({ row, headers }, actividad) {
+function normalizarFila({ headers, values }) {
   const get = (terms) => {
     const idx = findCol(headers, terms)
-    return idx >= 0 ? norm(row[idx] ?? row[headers[idx]]) : ''
+    return idx >= 0 ? norm(values[idx]) : ''
   }
 
-  const nombres = get(['nombre', 'nombres']) || (lower(actividad?.titulo) ? '' : '')
-  const apellidos = get(['apellido', 'apellidos', 'nombre apellidos'])
-  const dniRaw = get(['ci', 'cedula', 'cédula', 'dni', 'documento'])
+  const nombres = get(CANON.nombres)
+  const apellidos = get(CANON.apellidos)
+  const dniRaw = get(CANON.ci)
   const dni = dniRaw.replace(/\D/g, '')
-  const email = get(['correo', 'email', 'mail']).toLowerCase()
-  const telefono = get(['telefono', 'teléfono', 'wts', 'whatsapp', 'celular'])
-  const empresa = get(['empresa', 'compania', 'compañía'])
-  const cargo = get(['cargo'])
-  const categoria = get(['categoria', 'categoría', 'tipo'])
-  const pagoRaw = get(['pago', 'pagos', 'estatus', 'estado'])
-  const pagado = !pagoRaw || lower(pagoRaw).includes('pagado') && !lower(pagoRaw).includes('por pagar')
+  const email = get(CANON.correo).toLowerCase()
+  const telefono = get(CANON.telefono)
+  const empresa = get(CANON.empresa)
+  const cargo = get(CANON.cargo)
+  const categoria = get(CANON.categoria)
+  const factura = get(CANON.factura)
+  const pagoRaw = get(CANON.pago)
+  const pagado = !pagoRaw || (lower(pagoRaw).includes('pagado') && !lower(pagoRaw).includes('por pagar'))
 
   // "NOMBRE APELLIDOS" a veces viene junto en la columna de apellidos
   let apellidosFinal = apellidos
@@ -128,7 +155,7 @@ function normalizarFila({ row, headers }, actividad) {
   }
 
   const meta = mapCategoria(categoria)
-  const fechaRaw = get(['fecha de inscripcion', 'fecha inscripcion', 'fecha'])
+  const fechaRaw = get(CANON.fecha)
   const fechaInscripcion = excelDateToTs(fechaRaw)
 
   if (!nombresFinal) return null
@@ -142,6 +169,7 @@ function normalizarFila({ row, headers }, actividad) {
     empresa,
     cargo,
     categoria,
+    factura,
     pagado,
     fechaInscripcion,
     ...meta
@@ -187,7 +215,7 @@ export async function importarExcelInscritos({ arrayBuffer, actividad, onProgres
       const usersSnap = await get(ref(db, `${DB_ROOT}/users`))
       const users = usersSnap.val() || {}
       for (const [uId, u] of Object.entries(users)) {
-        if ((p.email && lower(u.email) === p.email) || String(u.dni || '').replace(/\D/g, '') === p.dni) {
+        if ((p.email && lower(u.email) === p.email) || (p.dni && String(u.dni || '').replace(/\D/g, '') === p.dni)) {
           uid = uId
           break
         }
@@ -265,6 +293,7 @@ export async function importarExcelInscritos({ arrayBuffer, actividad, onProgres
         afiliado: p.afiliado,
         planAfiliacion: p.planAfiliacion,
         monto: p.pagado ? (Number(actividad?.precio) || 0) : 0,
+        numeroFactura: p.factura || null,
         reutilizar
       })
       if (reutilizar) actualizados.push({ uid, ...p })

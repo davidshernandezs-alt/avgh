@@ -38,6 +38,7 @@ import {
   saveActividad,
   deleteActividad,
   deleteInscription,
+  deleteInscriptionsAndInvoicesBulk,
   createInscription,
   setUserAffiliation
 } from '../data/useData'
@@ -59,7 +60,7 @@ import TicketModal from '../components/TicketModal'
 import CertificateModal from '../components/CertificateModal'
 import AdminQuestions from '../components/AdminQuestions'
 import Toggle from '../components/Toggle'
-import { importarExcelInscritos } from '../data/excelImport'
+import { importarExcelInscritos, parsearExcelInscritos } from '../data/excelImport'
 
 const paymentLabels = {
   transfer: 'insc.payment.transfer',
@@ -793,6 +794,9 @@ function InscribedTab() {
   const [uploadMsg, setUploadMsg] = useState('')
   const [uploading, setUploading] = useState(false)
   const [updateExisting, setUpdateExisting] = useState(false)
+  const [preview, setPreview] = useState(null)
+  const [selected, setSelected] = useState({})
+  const [deleting, setDeleting] = useState(false)
   const [affPlan, setAffPlan] = useState({})
   const [certRow, setCertRow] = useState(null)
   const excelInputRef = useRef(null)
@@ -830,6 +834,41 @@ function InscribedTab() {
   const actTitle = (id) => {
     const a = actividades.find((x) => x.id === id)
     return a ? localize(a.titulo, lang) : id
+  }
+
+  const rowKey = (r) => `${r.uid}__${r.actividadId}`
+  const selectedRows = filtered.filter((r) => selected[rowKey(r)])
+  const allSelected = filtered.length > 0 && selectedRows.length === filtered.length
+
+  const toggleAll = () => {
+    if (allSelected) setSelected({})
+    else setSelected(Object.fromEntries(filtered.map((r) => [rowKey(r), true])))
+  }
+
+  const toggleOne = (r) => {
+    const key = rowKey(r)
+    setSelected((prev) => {
+      const next = { ...prev }
+      if (next[key]) delete next[key]
+      else next[key] = true
+      return next
+    })
+  }
+
+  const bulkDelete = async () => {
+    if (!selectedRows.length) return
+    if (!window.confirm(`¿Eliminar ${selectedRows.length} inscripción(es) y sus facturas? Esta acción no se puede deshacer.`)) return
+    setDeleting(true)
+    try {
+      const n = await deleteInscriptionsAndInvoicesBulk(selectedRows)
+      setSelected({})
+      setUploadMsg(`✅ Se eliminaron ${n} registros (inscripción y factura).`)
+    } catch (err) {
+      console.error(err)
+      alert(`Error al eliminar: ${err?.message || 'intenta de nuevo'}`)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const attendeeBadge = (tipo) => {
@@ -877,20 +916,38 @@ function InscribedTab() {
       return
     }
 
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const { people, porHoja } = parsearExcelInscritos({ arrayBuffer })
+      if (!people.length) {
+        setUploadMsg('No se encontraron registros válidos. Revisa que las columnas NOMBRE y CÉDULA/DNI estén presentes.')
+        setPreview(null)
+      } else {
+        setUploadMsg('')
+        setPreview({ fileName: file.name, arrayBuffer, people, porHoja })
+      }
+    } catch (err) {
+      console.error(err)
+      setUploadMsg(`Error al leer el archivo: ${err?.message || 'Verifica el formato.'}`)
+      setPreview(null)
+    } finally {
+      e.target.value = ''
+    }
+  }
+
+  const confirmarImportacion = async () => {
+    if (!preview) return
     const selectedAct = actividades.find((a) => a.id === filterAct)
     if (!selectedAct) {
       alert('Curso no encontrado.')
-      e.target.value = ''
       return
     }
 
     setUploading(true)
     setUploadMsg('Procesando archivo...')
-
     try {
-      const arrayBuffer = await file.arrayBuffer()
       const result = await importarExcelInscritos({
-        arrayBuffer,
+        arrayBuffer: preview.arrayBuffer,
         actividad: selectedAct,
         actualizarExistentes: updateExisting,
         onProgress: (m) => setUploadMsg(m)
@@ -900,9 +957,11 @@ function InscribedTab() {
       const upd = result.actualizados?.length || 0
       const ya = result.yaInscritos?.length || 0
       const conCorreo = result.created.filter((p) => p.email).length
+      const conTel = result.created.filter((p) => p.telefono).length
+      const conCi = result.created.filter((p) => p.dni).length
       const err = result.errores.length ? ` · ${result.errores.length} con error` : ''
       const detalle = [
-        ok ? `${ok} inscritos registrados en "${localize(selectedAct.titulo, lang)}" · ${conCorreo} con correo · clave = cédula` : '',
+        ok ? `${ok} inscritos registrados en "${localize(selectedAct.titulo, lang)}" · ${conCi} con cédula · ${conTel} con teléfono · ${conCorreo} con correo` : '',
         upd ? `${upd} actualizados (misma factura)` : '',
         ya ? `${ya} ya inscritos (omitidos, sin factura nueva)` : ''
       ].filter(Boolean).join(' · ')
@@ -911,12 +970,12 @@ function InscribedTab() {
       } else {
         setUploadMsg(`✅ ${detalle}${err}`)
       }
+      setPreview(null)
     } catch (err) {
       console.error(err)
       setUploadMsg(`Error al importar: ${err?.message || 'Verifica el formato.'}`)
     } finally {
       setUploading(false)
-      e.target.value = ''
     }
   }
 
@@ -962,6 +1021,59 @@ function InscribedTab() {
         </span>
       </label>
 
+      {preview && (
+        <div style={{ marginBottom: '16px', border: '1px solid #dbe6f7', borderRadius: '8px', padding: '14px', background: '#f8faff' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+            <div>
+              <strong>Vista previa: {preview.fileName}</strong>
+              <div style={{ fontSize: '12px', color: '#555' }}>
+                {preview.people.length} registros detectados
+                {Object.entries(preview.porHoja).map(([hoja, n]) => ` · ${hoja}: ${n}`).join('')}
+              </div>
+            </div>
+            <div className="btn-row">
+              <button className="btn btn-outline btn-sm" onClick={() => setPreview(null)} disabled={uploading}>
+                Cancelar
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={confirmarImportacion} disabled={uploading}>
+                {uploading ? 'Importando...' : '✅ Confirmar e importar'}
+              </button>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', fontSize: '12px' }}>
+              <thead>
+                <tr>
+                  <th>Factura</th>
+                  <th>Nombre</th>
+                  <th>Apellido</th>
+                  <th>Cédula</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Categoría</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.people.slice(0, 8).map((p, i) => (
+                  <tr key={i}>
+                    <td>{p.factura || '—'}</td>
+                    <td>{p.nombres || '—'}</td>
+                    <td>{p.apellidos || '—'}</td>
+                    <td>{p.dni || '—'}</td>
+                    <td>{p.telefono || '—'}</td>
+                    <td>{p.email || '—'}</td>
+                    <td>{p.categoria || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="auth-hint" style={{ marginTop: '8px', marginBottom: 0 }}>
+            El Excel no incluye columnas de Edad ni Sexo, por eso esos campos quedarán como “No indicado”.
+          </p>
+        </div>
+      )}
+
       {uploadMsg && (
         <div className="form-success" style={{ marginBottom: '14px', padding: '10px 14px', borderRadius: '6px' }}>
           {uploadMsg}
@@ -988,6 +1100,17 @@ function InscribedTab() {
         </select>
       </div>
 
+      <div className="bulk-bar" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px', padding: '10px 12px', background: '#f4f6fb', borderRadius: '6px' }}>
+        <label className="checkbox" style={{ margin: 0 }}>
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={!filtered.length || deleting} />
+          <span>Seleccionar todos los filtrados ({filtered.length})</span>
+        </label>
+        <span style={{ fontSize: '13px', color: '#555' }}>{selectedRows.length} seleccionado(s)</span>
+        <button className="btn btn-danger btn-sm" onClick={bulkDelete} disabled={!selectedRows.length || deleting}>
+          <FaTrash /> {deleting ? 'Eliminando...' : 'Eliminar seleccionados (inscripción + factura)'}
+        </button>
+      </div>
+
       {loading ? (
         <p className="loading">Cargando inscritos...</p>
       ) : filtered.length === 0 ? (
@@ -997,6 +1120,9 @@ function InscribedTab() {
           <table className="table">
             <thead>
               <tr>
+                <th style={{ width: '36px' }}>
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Seleccionar todos" />
+                </th>
                 <th>Participante</th>
                 <th>Cédula</th>
                 <th>Tipo de Asistente</th>
@@ -1013,6 +1139,14 @@ function InscribedTab() {
                 const isAffiliate = r.user?.afiliado === true
                 return (
                   <tr key={`${r.uid}-${r.actividadId}`}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selected[rowKey(r)])}
+                        onChange={() => toggleOne(r)}
+                        aria-label={`Seleccionar a ${r.user?.nombres || ''} ${r.user?.apellidos || ''}`}
+                      />
+                    </td>
                     <td><strong>{r.user?.nombres || ''} {r.user?.apellidos || ''}</strong><br /><small>{r.user?.email}</small></td>
                     <td>{r.user?.dni || r.user?.cedula || '—'}</td>
                     <td>{attendeeBadge(r.tipoAsistente)}</td>
