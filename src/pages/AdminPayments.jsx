@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FaSackDollar, FaFileInvoice, FaTrash, FaCheck } from 'react-icons/fa6'
+import { FaSackDollar, FaFileInvoice, FaTrash, FaCheck, FaFilePdf } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAllFacturas, deleteInvoice, setInscripcionEstado, deleteInscriptionsAndInvoicesBulk } from '../data/useData'
 import { ref, update } from 'firebase/database'
@@ -7,6 +7,7 @@ import { db, DB_ROOT } from '../firebase'
 import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
 import { CURRENCY } from '../config'
+import { viewReceipt, downloadReceipt } from '../utils/receiptFile'
 
 const paymentLabels = {
   transfer: 'insc.payment.transfer',
@@ -316,9 +317,14 @@ export default function AdminPayments() {
                       <td><FacturaBadge estado={r.factura.estado} /></td>
                       <td>
                         {r.factura.comprobante ? (
-                          <a href={r.factura.comprobante} target="_blank" rel="noopener noreferrer" className="receipt-ok" title={isPdf ? t('profile.openPdf') : t('profile.viewImage')}>
-                            ✓
-                          </a>
+                          <div className="btn-row btn-row-sm">
+                            <button className="btn btn-outline btn-sm" onClick={() => viewReceipt(r.factura.comprobante)} title="Ver comprobante">
+                              <FaFilePdf /> Ver
+                            </button>
+                            <button className="btn btn-outline btn-sm" onClick={() => downloadReceipt(r.factura.comprobante, r.factura.comprobanteNombre)} title="Descargar comprobante">
+                              ↓
+                            </button>
+                          </div>
                         ) : (
                           <span className="receipt-no">—</span>
                         )}

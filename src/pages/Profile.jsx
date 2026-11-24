@@ -22,6 +22,7 @@ import UserQuestions from '../components/UserQuestions'
 import { formatDate } from '../components/ActivityCard'
 import { CURRENCY } from '../config'
 import { fileToStorable } from '../utils/files'
+import { getReceipt, isPdfUrl, viewReceipt, downloadReceipt } from '../utils/receiptFile'
 import TicketModal from '../components/TicketModal'
 import CertificateModal from '../components/CertificateModal'
 import CompanyEmployees from '../components/CompanyEmployees'
@@ -46,7 +47,7 @@ function ReceiptUpload({ factura, uid }) {
     setBusy(true)
     setMsg('')
     try {
-      const stored = await fileToStorable(file, 1000)
+      const stored = await fileToStorable(file, 1200, 'fit')
       await uploadComprobante({
         uid,
         facturaId: factura.id,
@@ -82,15 +83,18 @@ function ReceiptUpload({ factura, uid }) {
         )}
       </div>
 
-      {has && isPdf && (
-        <a className="btn btn-outline btn-sm" href={factura.comprobante} target="_blank" rel="noopener noreferrer">
-          <FaFilePdf /> {t('profile.openPdf')}
-        </a>
-      )}
-      {has && !isPdf && (
-        <a href={factura.comprobante} target="_blank" rel="noopener noreferrer" className="receipt-thumb-link">
-          <img src={factura.comprobante} alt={t('profile.receipt')} className="receipt-thumb" />
-        </a>
+      {has && (
+        <div className="btn-row btn-row-sm">
+          {!isPdf && (
+            <img src={getReceipt(factura.comprobante)?.url} alt={t('profile.receipt')} className="receipt-thumb" />
+          )}
+          <button className="btn btn-outline btn-sm" onClick={() => viewReceipt(factura.comprobante)}>
+            <FaFilePdf /> {isPdf ? t('profile.openPdf') : 'Ver imagen'}
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={() => downloadReceipt(factura.comprobante, factura.comprobanteNombre)}>
+            ↓ Descargar
+          </button>
+        </div>
       )}
       {!has && <p className="receipt-empty">{t('profile.receiptEmpty')}</p>}
 

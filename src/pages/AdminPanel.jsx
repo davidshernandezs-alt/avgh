@@ -62,6 +62,7 @@ import CertificateModal from '../components/CertificateModal'
 import AdminQuestions from '../components/AdminQuestions'
 import Toggle from '../components/Toggle'
 import { importarExcelInscritos, parsearExcelInscritos } from '../data/excelImport'
+import { getReceipt, isPdfUrl, viewReceipt, downloadReceipt } from '../utils/receiptFile'
 
 const paymentLabels = {
   transfer: 'insc.payment.transfer',
@@ -400,19 +401,25 @@ function RequestsTab() {
             <h4>{t('admin.receiptData')}</h4>
             {receipt?.comprobante ? (
               (() => {
-                const c = receipt.comprobante
-                const isPdf = c.startsWith('data:application/pdf')
-                return isPdf ? (
+                const r = getReceipt(receipt.comprobante)
+                const pdf = isPdfUrl(r?.url)
+                return (
                   <div className="receipt-preview">
-                    <FaFilePdf className="receipt-icon-lg" />
-                    <a className="btn btn-primary btn-sm" href={c} target="_blank" rel="noopener noreferrer">
-                      <FaFilePdf /> {t('profile.openPdf')} · {receipt.comprobanteNombre}
-                    </a>
+                    {pdf ? (
+                      <FaFilePdf className="receipt-icon-lg" />
+                    ) : (
+                      <img src={r.url} alt={t('admin.receiptYes')} className="receipt-img" />
+                    )}
+                    <div className="btn-row">
+                      <button className="btn btn-primary btn-sm" onClick={() => viewReceipt(receipt.comprobante)}>
+                        <FaFilePdf /> Ver en pestaña nueva
+                      </button>
+                      <button className="btn btn-outline btn-sm" onClick={() => downloadReceipt(receipt.comprobante, receipt.comprobanteNombre)}>
+                        Descargar
+                      </button>
+                    </div>
+                    {receipt.comprobanteNombre && <small>{receipt.comprobanteNombre}</small>}
                   </div>
-                ) : (
-                  <a className="receipt-preview" href={c} target="_blank" rel="noopener noreferrer">
-                    <img src={c} alt={t('admin.receiptYes')} className="receipt-img" />
-                  </a>
                 )
               })()
             ) : (
@@ -833,6 +840,7 @@ function InscribedTab() {
   const { items: actividades } = useActivities()
   const [search, setSearch] = useState('')
   const [filterAct, setFilterAct] = useState('')
+  const [sortBy, setSortBy] = useState('nombre-asc')
   const [uploadMsg, setUploadMsg] = useState('')
   const [uploading, setUploading] = useState(false)
   const [updateExisting, setUpdateExisting] = useState(false)
@@ -871,7 +879,12 @@ function InscribedTab() {
       const matchAct = filterAct ? r.actividadId === filterAct : true
       return matchSearch && matchAct
     })
-  }, [rows, search, filterAct])
+    .sort((a, b) => {
+      if (sortBy === 'nombre-desc') return clientName(b.user).localeCompare(clientName(a.user), 'es')
+      if (sortBy === 'recientes') return (b.fecha || 0) - (a.fecha || 0)
+      return clientName(a.user).localeCompare(clientName(b.user), 'es')
+    })
+  }, [rows, search, filterAct, sortBy])
 
   const actTitle = (id) => {
     const a = actividades.find((x) => x.id === id)
@@ -1143,6 +1156,16 @@ function InscribedTab() {
           {actividades.map((a) => (
             <option key={a.id} value={a.id}>{localize(a.titulo, lang)}</option>
           ))}
+        </select>
+        <select
+          className="input"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          aria-label="Ordenar inscritos"
+        >
+          <option value="nombre-asc">Orden: Nombre A-Z</option>
+          <option value="nombre-desc">Orden: Nombre Z-A</option>
+          <option value="recientes">Orden: Más recientes</option>
         </select>
       </div>
 

@@ -37,6 +37,7 @@ export default function AdminMembers() {
   const { employees: allEmployees, loading: loadingEmp } = useAllCompaniesEmployees()
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('nombre-asc')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState(null)
   const [busy, setBusy] = useState(null)
@@ -49,8 +50,13 @@ export default function AdminMembers() {
     const texto = `${clientName(u)} ${u.email || ''} ${u.dni || ''}`.toLowerCase()
     return matchTipo && texto.includes(search.toLowerCase())
   })
+  list.sort((a, b) => {
+    if (sortBy === 'nombre-desc') return clientName(b).localeCompare(clientName(a), 'es')
+    if (sortBy === 'recientes') return (b.fechaRegistro || 0) - (a.fechaRegistro || 0)
+    return clientName(a).localeCompare(clientName(b), 'es')
+  })
 
-  useEffect(() => { setPage(1) }, [filter, search])
+  useEffect(() => { setPage(1) }, [filter, search, sortBy])
 
   const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -153,6 +159,17 @@ export default function AdminMembers() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <select
+          className="input"
+          style={{ marginBottom: '14px', maxWidth: '220px' }}
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          aria-label="Ordenar afiliados"
+        >
+          <option value="nombre-asc">Orden: Nombre A-Z</option>
+          <option value="nombre-desc">Orden: Nombre Z-A</option>
+          <option value="recientes">Orden: Más recientes</option>
+        </select>
 
         {loading ? (
           <div className="loading">{t('cat.loading')}</div>

@@ -78,12 +78,17 @@ export async function fileToStorable(file, maxDim, mode = 'square') {
   if (file.type === 'application/pdf') {
     return { dataUrl: await readAsDataUrl(file), type: file.type, name: file.name }
   }
-  if (file.type === 'image/jpeg' || file.type === 'image/png') {
+  const type = file.type || (/\.pdf$/i.test(file.name || '') ? 'application/pdf' : '')
+  if (type === 'image/jpeg' || type === 'image/png' || type === 'image/webp') {
+    // Los comprobantes se redimensionan SIN recortar (modo "fit").
     const dataUrl =
-      mode === 'banner'
-        ? await imageFitToDataUrl(file, 1200, 675)
+      mode === 'banner' || mode === 'fit'
+        ? await imageFitToDataUrl(file, maxDim || 1200, maxDim || 900)
         : await imageSquareCropToDataUrl(file, 500)
     return { dataUrl, type: 'image/jpeg', name: file.name }
+  }
+  if (type === 'application/pdf') {
+    return { dataUrl: await readAsDataUrl(file), type: 'application/pdf', name: file.name }
   }
   throw new Error('bad-type')
 }
