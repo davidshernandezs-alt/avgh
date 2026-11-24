@@ -163,7 +163,7 @@ export function useMyFacturas(uid) {
 
 // Inscripción atómica con control de cupo: solo ocupa si quedan lugares.
 // Si no hay, se registra en lista de espera.
-export async function createInscriptionWithCapacity({ uid, actividad, user, metodoPago, estado, monto, desglose, afiliado, planAfiliacion, facturacion, yaReservados = 0 }) {
+export async function createInscriptionWithCapacity({ uid, actividad, user, metodoPago, estado, monto, desglose, afiliado, planAfiliacion, facturacion, tipoAsistente, yaReservados = 0 }) {
   const actId = actividad?.id
   const cupo = Number(actividad?.cupo) || 0
   const inscRef = ref(db, `${DB_ROOT}/inscripciones/${uid}/${actId}`)
@@ -189,6 +189,7 @@ export async function createInscriptionWithCapacity({ uid, actividad, user, meto
     uid, actividad, user, metodoPago, estado,
     monto: enEspera ? 0 : monto,
     desglose, afiliado, planAfiliacion, facturacion,
+    tipoAsistente: tipoAsistente || (desglose?.tipoAsistente || 'regular'),
     listaEspera: enEspera
   })
 }

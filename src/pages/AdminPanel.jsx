@@ -101,6 +101,7 @@ function RequestsTab() {
   const [showTicket, setShowTicket] = useState(false)
   const [filterEstado, setFilterEstado] = useState('pendiente')
   const [sortBy, setSortBy] = useState('nombre-asc')
+  const [search, setSearch] = useState('')
 
   const countsEstado = useMemo(() => ({
     pendiente: rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera').length,
@@ -114,13 +115,22 @@ function RequestsTab() {
     if (filterEstado === 'pendiente') out = rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera')
     else if (filterEstado === 'aprobada') out = rows.filter((r) => r.estado === 'confirmada' || r.estado === 'completada' || r.estado === 'confirmed')
     else if (filterEstado === 'rechazada') out = rows.filter((r) => r.estado === 'rechazada')
+    // Buscador por nombre, apellido, cédula, correo o empresa
+    const q = search.trim().toLowerCase()
+    if (q) {
+      out = out.filter((r) => {
+        const u = r.user || {}
+        return [u.nombres, u.apellidos, u.dni, u.cedula, u.email, u.empresa, u.nombreEmpresa]
+          .some((v) => String(v || '').toLowerCase().includes(q))
+      })
+    }
     const nameOf = (r) => `${r.user?.nombres || ''} ${r.user?.apellidos || ''}`.trim()
     return [...out].sort((a, b) => {
       if (sortBy === 'nombre-desc') return nameOf(b).localeCompare(nameOf(a), 'es')
       if (sortBy === 'recientes') return (b.fecha || 0) - (a.fecha || 0)
       return nameOf(a).localeCompare(nameOf(b), 'es')
     })
-  }, [rows, filterEstado, sortBy])
+  }, [rows, filterEstado, sortBy, search])
 
   const actById = useMemo(() => {
     const m = {}
@@ -222,6 +232,17 @@ function RequestsTab() {
           </div>
         </div>
 
+        <div className="btn-row" style={{ marginBottom: '16px' }}>
+          <input
+            type="text"
+            className="input"
+            style={{ maxWidth: '400px' }}
+            placeholder="Buscar por nombre, apellido, cédula, correo o empresa..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Buscar solicitudes"
+          />
+        </div>
         <div className="btn-row" style={{ marginBottom: '16px' }}>
           <button className="btn btn-outline btn-sm" onClick={exportExcel}>
             <FaFileExcel /> Descargar ventas del día (Excel)

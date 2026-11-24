@@ -31,7 +31,9 @@ export default function ActivityCard({ item }) {
     profile,
     config: affConfig,
     actividad: item,
-    tipoAsistente: tipoAsistenteEn(misInscripciones, item?.id)
+    tipoAsistente: tipoAsistenteEn(misInscripciones, item?.id) ||
+      (profile?.perfilAsistente === 'junta' ? 'junta'
+        : profile?.perfilAsistente === 'facilitador' ? 'facilitador' : '')
   })
   const title = localized(item.titulo, lang)
   const desc = localized(item.descripcion, lang)

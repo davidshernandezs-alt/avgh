@@ -29,7 +29,9 @@ export default function ActivityDetail() {
     profile,
     config: affConfig,
     actividad: item,
-    tipoAsistente: tipoAsistenteEn(misInscripciones, id)
+    tipoAsistente: tipoAsistenteEn(misInscripciones, id) ||
+      (profile?.perfilAsistente === 'junta' ? 'junta'
+        : profile?.perfilAsistente === 'facilitador' ? 'facilitador' : '')
   })
   const navigate = useNavigate()
 

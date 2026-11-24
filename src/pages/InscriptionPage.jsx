@@ -171,11 +171,19 @@ export default function InscriptionPage() {
 
   const isCompany = profile?.tipoPersona === 'juridico'
   const countParticipants = isCompany && selectedEmployees.length > 0 ? selectedEmployees.length : 1
+  // El rol del perfil (junta directiva / facilitador) define el tipo de asistente
+  // y hace que la inscripción sea gratuita.
+  const perfilRol = profile?.perfilAsistente || 'asistente'
+  const tipoAsistente = perfilRol === 'junta' ? 'junta'
+    : perfilRol === 'facilitador' ? 'facilitador'
+      : 'regular'
   const pricing = calcularPrecioInscripcion({
     precio: item?.precio,
     profile,
     config: affConfig,
-    countParticipants
+    countParticipants,
+    actividad: item,
+    tipoAsistente
   })
   const {
     precioBase,
@@ -248,6 +256,7 @@ export default function InscriptionPage() {
               metodoPago: isFree ? 'gratis' : metodoPago,
               estado: 'pendiente',
               monto: isFree ? 0 : montoUnitario,
+              tipoAsistente: 'regular',
               afiliado: pricing.afiliado,
               planAfiliacion,
               desglose: {
@@ -257,6 +266,7 @@ export default function InscriptionPage() {
                 montoUnitario: isFree ? 0 : montoUnitario,
                 afiliado: pricing.afiliado,
                 planAfiliacion,
+                tipoAsistente: 'regular',
                 countParticipants: 1
               }
             })
@@ -288,6 +298,7 @@ export default function InscriptionPage() {
           facturacion: datosFacturacion,
           metodoPago: isFree ? 'gratis' : metodoPago,
           monto: isFree ? 0 : montoUnitario,
+          tipoAsistente,
           afiliado: pricing.afiliado,
           planAfiliacion,
           desglose: {
@@ -297,6 +308,7 @@ export default function InscriptionPage() {
             montoUnitario: isFree ? 0 : montoUnitario,
             afiliado: pricing.afiliado,
             planAfiliacion,
+            tipoAsistente,
             countParticipants: 1
           }
         })
