@@ -111,44 +111,93 @@ export default function AdminQRValidation() {
     setBusy(true)
 
     try {
-      let parts = clean.split('|')
-      if (clean.includes('AVGH|')) {
-        const idx = clean.indexOf('AVGH|')
-        parts = clean.slice(idx).split('|')
+      // Decodificar por si el QR viene URL-encoded (AVGH%7Cuid%7Cact) o dentro de una URL (?data=...)
+      let decoded = clean
+      try { decoded = decodeURIComponent(clean) } catch { /* ya venía decodificado */ }
+      const urlData = decoded.match(/[?&]data=([^&]+)/)
+      if (urlData) {
+        try { decoded = decodeURIComponent(urlData[1]) } catch { decoded = urlData[1] }
       }
 
-      if (parts.length < 3 || parts[0] !== 'AVGH') {
+      let parts = decoded.split('|')
+      const idx = decoded.indexOf('AVGH|')
+      if (idx >= 0) parts = decoded.slice(idx).split('|')
+
+      if (parts.length < 2 || parts[0] !== 'AVGH') {
         setError(t('qr.invalidCode') || 'Código QR no válido')
         setBusy(false)
         return
       }
 
-      const [, uid, actividadId] = parts
+      let uid = (parts[1] || '').trim()
+      let actividadId = (parts[2] || '').trim()
+      let foundUid = uid
 
-      const [userSnap, inscSnap, actSnap] = await Promise.all([
-        get(ref(db, `${DB_ROOT}/users/${uid}`)),
-        get(ref(db, `${DB_ROOT}/inscripciones/${uid}/${actividadId}`)),
-        get(ref(db, `${DB_ROOT}/actividades/${actividadId}`))
-      ])
+      // 1) Ruta directa: inscripciones/{uid}/{actividadId}
+      let inscSnap = uid && actividadId
+        ? await get(ref(db, `${DB_ROOT}/inscripciones/${uid}/${actividadId}`))
+        : null
 
-      const user = userSnap.val()
-      const insc = inscSnap.val()
-      const act = actSnap.val()
+      // 2) QR con solo uid: tomar la primera actividad inscrita
+      if (!inscSnap?.exists() && uid && !actividadId) {
+        const byUid = await get(ref(db, `${DB_ROOT}/inscripciones/${uid}`))
+        if (byUid.exists()) {
+          actividadId = Object.keys(byUid.val())[0]
+          inscSnap = await get(ref(db, `${DB_ROOT}/inscripciones/${uid}/${actividadId}`))
+        }
+      }
 
-      if (!user || !insc) {
+      // 3) El QR puede traer la cédula en vez del uid: buscar en TODAS las inscripciones
+      const candidatos = [uid, (parts[3] || '').trim()].filter(Boolean)
+      if (!inscSnap?.exists() && candidatos.length) {
+        const allSnap = await get(ref(db, `${DB_ROOT}/inscripciones`))
+        const all = allSnap.val() || {}
+        let encontrado = false
+        for (const cand of candidatos) {
+          const q = cand.toLowerCase()
+          for (const [u, acts] of Object.entries(all)) {
+            for (const [aId, data] of Object.entries(acts || {})) {
+              const pu = data?.user || {}
+              const ids = [pu.dni, pu.cedula, u].map((x) => String(x || '').toLowerCase())
+              if (ids.some((x) => x === q || (q.length >= 6 && x.includes(q)))) {
+                foundUid = u
+                actividadId = aId
+                inscSnap = await get(ref(db, `${DB_ROOT}/inscripciones/${u}/${aId}`))
+                encontrado = true
+                break
+              }
+            }
+            if (encontrado) break
+          }
+          if (encontrado) break
+        }
+      }
+
+      const insc = inscSnap?.val()
+      if (!insc) {
         setError(t('qr.notFound') || 'No se encontró la inscripción o el participante')
         setBusy(false)
         return
       }
+      foundUid = foundUid || uid
+
+      // Los inscritos manualmente/importados pueden no tener nodo en /users.
+      // En ese caso usamos los datos guardados dentro de la inscripción.
+      const [userSnap, actSnap] = await Promise.all([
+        get(ref(db, `${DB_ROOT}/users/${foundUid}`)),
+        get(ref(db, `${DB_ROOT}/actividades/${actividadId}`))
+      ])
+      const user = userSnap.val() || insc.user || null
+      const act = actSnap.val()
 
       let factura = null
       if (insc.facturaId) {
-        const facSnap = await get(ref(db, `${DB_ROOT}/facturas/${uid}/${insc.facturaId}`))
+        const facSnap = await get(ref(db, `${DB_ROOT}/facturas/${foundUid}/${insc.facturaId}`))
         factura = facSnap.val()
       }
 
       // Marcar asistencia presencial (presente: true) en la base de datos
-      await update(ref(db, `${DB_ROOT}/inscripciones/${uid}/${actividadId}`), {
+      await update(ref(db, `${DB_ROOT}/inscripciones/${foundUid}/${actividadId}`), {
         presente: true,
         fechaAsistencia: Date.now()
       })

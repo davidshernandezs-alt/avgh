@@ -60,6 +60,8 @@ export default function AdminDashboard() {
     dni: '',
     email: '',
     tipoAsistente: 'regular',
+    metodoPago: 'cash',
+    pagado: true,
     actividadId: actividades[0]?.id || ''
   })
   const [affiliateForm, setAffiliateForm] = useState({
@@ -157,6 +159,8 @@ export default function AdminDashboard() {
     setMsg('')
     try {
       const act = actividades.find((a) => a.id === targetActId)
+      const esGratis = ['exonerado', 'invitado', 'junta', 'facilitador'].includes(manualForm.tipoAsistente)
+      const pagado = esGratis || manualForm.pagado
       const fakeUser = {
         nombres: manualForm.nombres,
         apellidos: manualForm.apellidos || '',
@@ -164,17 +168,30 @@ export default function AdminDashboard() {
         dni: manualForm.dni
       }
       const fakeUid = `manual_${Date.now()}_${Math.floor(Math.random() * 1000)}`
+      const esAfiliado = ['afiliado'].includes(manualForm.tipoAsistente)
+      await set(ref(db, `${DB_ROOT}/users/${fakeUid}`), {
+        ...fakeUser,
+        rol: 'member',
+        tipoPersona: 'natural',
+        afiliado: esAfiliado,
+        tipoAfiliacion: esAfiliado ? 'individual' : '',
+        planAfiliacion: esAfiliado ? 'individual' : '',
+        afiliadoDesde: esAfiliado ? Date.now() : null,
+        fechaRegistro: Date.now()
+      })
       await createInscription({
         uid: fakeUid,
         actividad: act,
         user: fakeUser,
-        metodoPago: 'cash',
-        estado: 'confirmada',
+        metodoPago: esGratis ? 'gratis' : manualForm.metodoPago,
+        estado: pagado ? 'confirmada' : 'pendiente',
+        monto: esGratis ? 0 : (pagado ? (Number(act?.precio) || 0) : 0),
         tipoAsistente: manualForm.tipoAsistente,
+        validadaFecha: pagado ? Date.now() : null,
         presente: false
       })
       setMsg('✅ Inscripción manual registrada con éxito.')
-      setManualForm({ nombres: '', apellidos: '', dni: '', email: '', tipoAsistente: 'regular', actividadId: targetActId })
+      setManualForm({ nombres: '', apellidos: '', dni: '', email: '', tipoAsistente: 'regular', metodoPago: 'cash', pagado: true, actividadId: targetActId })
     } catch {
       setMsg(t('admin.errorSave'))
     } finally {
@@ -495,6 +512,38 @@ export default function AdminDashboard() {
               <option value="exonerado">Exonerado / Apartado (Naranja)</option>
             </select>
           </label>
+
+          <div className="field-row">
+            <label className="field-label">
+              <span>Método de pago</span>
+              <select
+                className="input"
+                value={manualForm.metodoPago}
+                onChange={(e) => setManualForm({ ...manualForm, metodoPago: e.target.value })}
+              >
+                <option value="cash">Efectivo</option>
+                <option value="transfer">Transferencia</option>
+                <option value="mobile">Pago móvil</option>
+                <option value="binance">Binance Pay</option>
+                <option value="card">Tarjeta</option>
+              </select>
+            </label>
+            <label className="field-label">
+              <span>¿Está pagado?</span>
+              <select
+                className="input"
+                value={manualForm.pagado ? 'si' : 'no'}
+                onChange={(e) => setManualForm({ ...manualForm, pagado: e.target.value === 'si' })}
+              >
+                <option value="si">Sí, pagado</option>
+                <option value="no">No pagado (pendiente)</option>
+              </select>
+            </label>
+          </div>
+          <p className="auth-hint">
+            El estado se refleja en la factura: pagado → <strong>completada</strong>; no pagado → <strong>pendiente</strong>.
+            Los tipos exonerado, invitado, junta y facilitador son siempre gratuitos.
+          </p>
 
           {msg && <p className="form-success">{msg}</p>}
 

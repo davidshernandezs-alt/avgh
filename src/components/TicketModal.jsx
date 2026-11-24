@@ -12,7 +12,7 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
   const ticketRef = useRef(null)
   const [downloading, setDownloading] = useState(false)
   const title = localize(act?.titulo, lang)
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`AVGH|${user?.uid}|${act?.id || insc?.actividadId}`)}`
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`AVGH|${user?.uid}|${act?.id || insc?.actividadId}|${user?.dni || user?.cedula || ''}`)}`
 
   const isPaid =
     ['completada', 'aprobada'].includes(factura?.estado) ||
