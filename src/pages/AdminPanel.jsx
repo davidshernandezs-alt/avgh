@@ -230,13 +230,51 @@ function RequestsTab() {
         <div className="qr-modal-backdrop admin-review-backdrop" onClick={() => setSelected(null)}>
           <section className="panel admin-detail" onClick={(e) => e.stopPropagation()}>
             <div className="admin-detail-head">
-            <h3>{t('admin.review')}</h3>
-            <button className="btn-icon" onClick={() => setSelected(null)} aria-label={t('admin.close')}>
-              <FaXmark />
-            </button>
-          </div>
+              <h3>{t('admin.review')}</h3>
+              <button className="btn-icon" onClick={() => setSelected(null)} aria-label={t('admin.close')}>
+                <FaXmark />
+              </button>
+            </div>
 
-          <div className="admin-grid">
+            <div className="admin-actions-bar">
+              <div className="btn-row">
+                <button className="btn btn-primary" disabled={busy} onClick={() => applyEstado('confirmada')}>
+                  <FaCircleCheck /> {t('admin.approve')}
+                </button>
+                <button className="btn btn-danger" disabled={busy} onClick={() => applyEstado('rechazada')}>
+                  <FaCircleXmark /> {t('admin.reject')}
+                </button>
+                <button className="btn btn-ghost" disabled={busy} onClick={deleteReq} style={{ color: 'var(--danger)' }}>
+                  <FaTrash /> Eliminar
+                </button>
+              </div>
+              <div className="btn-row">
+                <a
+                  className="btn btn-outline"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(row.user?.email || '')}&su=${encodeURIComponent('Carnet QR de Inscripción - AVGH')}&body=${encodeURIComponent(`Hola ${row.user?.nombres || ''},\n\nTus datos e inscripción al curso "${activ ? localize(activ.titulo, lang) : ''}" han sido procesados y validados con éxito.\n\nAdjunto a este correo encontrarás tu Carnet de Acceso en PDF que incluye tu código QR oficial y los datos de tu inscripción ya pagada. También puedes consultar o presentar tu código QR en cualquier momento desde tu perfil de usuario en la plataforma.\n\n¡Te esperamos!\nAsociación Venezolana de Gestión Humana (AVGH)`)}`}
+                >
+                  ✉️ Enviar QR por correo (Gmail)
+                </a>
+                <button className="btn btn-outline" onClick={() => setShowTicket(true)}>
+                  🖨️ Ver / Descargar Carnet PDF
+                </button>
+              </div>
+              {msg && <p className="form-success">{msg}</p>}
+            </div>
+
+            {showTicket && (
+              <TicketModal
+                user={{ uid: row.uid, email: row.user?.email, ...row.user }}
+                insc={row}
+                act={activ}
+                factura={row.factura}
+                onClose={() => setShowTicket(false)}
+              />
+            )}
+
+            <div className="admin-grid">
             <div className="admin-section">
               <h4>{t('admin.studentData')}</h4>
               <div className="admin-student">
@@ -345,44 +383,11 @@ function RequestsTab() {
             )}
           </div>
 
-          <div className="admin-validate">
+          <div className="admin-validate admin-note-bottom">
             <label className="field-label">
               <span><FaNoteSticky /> {t('admin.notePlaceholder')}</span>
               <textarea className="input textarea" value={nota} onChange={(e) => setNota(e.target.value)} placeholder={t('admin.notePlaceholder')} />
             </label>
-            <div className="btn-row">
-              <button className="btn btn-primary" disabled={busy} onClick={() => applyEstado('confirmada')}>
-                <FaCircleCheck /> {t('admin.approve')}
-              </button>
-              <button className="btn btn-danger" disabled={busy} onClick={() => applyEstado('rechazada')}>
-                <FaCircleXmark /> {t('admin.reject')}
-              </button>
-              <button className="btn btn-ghost" disabled={busy} onClick={deleteReq} style={{ color: 'var(--danger)' }}>
-                <FaTrash /> Eliminar
-              </button>
-            </div>
-            <a
-              className="btn btn-outline btn-block"
-              style={{ marginTop: '10px' }}
-              target="_blank"
-              rel="noopener noreferrer"
-              href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(row.user?.email || '')}&su=${encodeURIComponent('Carnet QR de Inscripción - AVGH')}&body=${encodeURIComponent(`Hola ${row.user?.nombres || ''},\n\nTus datos e inscripción al curso "${activ ? localize(activ.titulo, lang) : ''}" han sido procesados y validados con éxito.\n\nAdjunto a este correo encontrarás tu Carnet de Acceso en PDF que incluye tu código QR oficial y los datos de tu inscripción ya pagada. También puedes consultar o presentar tu código QR en cualquier momento desde tu perfil de usuario en la plataforma.\n\n¡Te esperamos!\nAsociación Venezolana de Gestión Humana (AVGH)`)}`}
-            >
-              ✉️ Enviar QR por correo al participante (Gmail)
-            </a>
-            <button className="btn btn-outline btn-block" style={{ marginTop: '8px' }} onClick={() => setShowTicket(true)}>
-              🖨️ Ver y Descargar Carnet PDF del Participante
-            </button>
-            {showTicket && (
-              <TicketModal
-                user={{ uid: row.uid, email: row.user?.email, ...row.user }}
-                insc={row}
-                act={activ}
-                factura={row.factura}
-                onClose={() => setShowTicket(false)}
-              />
-            )}
-            {msg && <p className="form-success">{msg}</p>}
           </div>
           </section>
         </div>
@@ -959,7 +964,9 @@ function InscribedTab() {
       const conCorreo = result.created.filter((p) => p.email).length
       const conTel = result.created.filter((p) => p.telefono).length
       const conCi = result.created.filter((p) => p.dni).length
-      const err = result.errores.length ? ` · ${result.errores.length} con error` : ''
+      const err = result.errores.length
+        ? ` · ${result.errores.length} con error: ${result.errores.slice(0, 5).join(' | ')}`
+        : ''
       const detalle = [
         ok ? `${ok} inscritos registrados en "${localize(selectedAct.titulo, lang)}" · ${conCi} con cédula · ${conTel} con teléfono · ${conCorreo} con correo` : '',
         upd ? `${upd} actualizados (misma factura)` : '',

@@ -1,12 +1,16 @@
-import { FaXmark, FaPrint, FaCircleCheck } from 'react-icons/fa6'
+import { useRef, useState } from 'react'
+import { FaXmark, FaDownload, FaCircleCheck } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { localize } from '../utils/localized'
 import { formatDate } from '../components/ActivityCard'
 import { SITE_NAME } from '../config'
+import { downloadTicketPDF } from '../utils/ticketPdf'
 import logoUrl from '../assets/avgh_logo.png'
 
 export default function TicketModal({ user, insc, act, factura, onClose }) {
   const { t, lang } = useLang()
+  const ticketRef = useRef(null)
+  const [downloading, setDownloading] = useState(false)
   const title = localize(act?.titulo, lang)
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(`AVGH|${user?.uid}|${act?.id || insc?.actividadId}`)}`
 
@@ -14,10 +18,17 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
     ['completada', 'aprobada'].includes(factura?.estado) ||
     (Number(insc?.monto || factura?.monto) === 0 && insc?.estado === 'confirmada')
 
-  const handlePrint = () => {
-    document.body.classList.add('printing-ticket')
-    window.print()
-    window.addEventListener('afterprint', () => document.body.classList.remove('printing-ticket'), { once: true })
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      const nombre = `${user?.nombres || ''}-${user?.apellidos || ''}`.trim().replace(/\s+/g, '-') || 'participante'
+      await downloadTicketPDF(ticketRef.current, `Carnet-AVGH-${nombre}.pdf`)
+    } catch (err) {
+      console.error(err)
+      alert('No se pudo generar el PDF del carnet. Intenta de nuevo.')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -30,7 +41,7 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
           </button>
         </div>
 
-        <div className="ticket-body" id="printable-ticket">
+        <div className="ticket-body" id="printable-ticket" ref={ticketRef}>
           <div className="ticket-header">
             <img src={logoUrl} alt={SITE_NAME} className="ticket-logo" />
             <h2>{SITE_NAME}</h2>
@@ -65,14 +76,14 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
           </div>
 
           <div className="ticket-qr-section">
-            <img src={qrUrl} alt="QR Code" className="ticket-qr-img" />
+            <img src={qrUrl} alt="QR Code" className="ticket-qr-img" crossOrigin="anonymous" />
             <span className="ticket-qr-hint">Presente este código QR al ingresar a la actividad</span>
           </div>
         </div>
 
         <div className="ticket-actions no-print">
-          <button className="btn btn-primary btn-block" onClick={handlePrint}>
-            <FaPrint /> Imprimir / Guardar PDF
+          <button className="btn btn-primary btn-block" onClick={handleDownload} disabled={downloading}>
+            <FaDownload /> {downloading ? 'Generando PDF...' : 'Descargar PDF del carnet'}
           </button>
         </div>
       </div>

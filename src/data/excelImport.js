@@ -24,6 +24,13 @@ function excelDateToTs(value) {
 
 const norm = (v) => String(v ?? '').trim()
 const lower = (v) => norm(v).toLowerCase()
+// Algunas filas traen varios correos en la misma celda separados por ";" o ",".
+// Firebase Auth solo acepta un email válido, así que nos quedamos con el primero.
+function primerEmail(valor) {
+  const texto = lower(valor).replace(/[,;]/g, ' ')
+  const match = texto.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/)
+  return match ? match[0] : ''
+}
 // Normalización fuerte: quita espacios, puntos, guiones y acentos.
 // "FECHA DE INSCRIPCIÓN" => "fechadeinscripcion"
 const keyOf = (v) => lower(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
@@ -136,7 +143,7 @@ function normalizarFila({ headers, values }) {
   const apellidos = get(CANON.apellidos)
   const dniRaw = get(CANON.ci)
   const dni = dniRaw.replace(/\D/g, '')
-  const email = get(CANON.correo).toLowerCase()
+  const email = primerEmail(get(CANON.correo))
   const telefono = get(CANON.telefono)
   const empresa = get(CANON.empresa)
   const cargo = get(CANON.cargo)

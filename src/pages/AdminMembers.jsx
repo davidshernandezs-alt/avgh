@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FaUsers, FaXmark, FaBuilding, FaUser, FaBan, FaUserSlash, FaLockOpen, FaTrash } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAllUsers, useAllCompaniesEmployees, setUserEstado, deleteUserAccount } from '../data/useData'
@@ -36,15 +36,25 @@ export default function AdminMembers() {
   const { items, loading, error } = useAllUsers()
   const { employees: allEmployees, loading: loadingEmp } = useAllCompaniesEmployees()
   const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [selected, setSelected] = useState(null)
   const [busy, setBusy] = useState(null)
   const [planDraft, setPlanDraft] = useState({})
+  const PAGE_SIZE = 9
 
   const members = items.filter((u) => u.rol !== 'admin')
-  const list =
-    filter === 'all'
-      ? members
-      : members.filter((u) => (u.tipoPersona || 'natural') === filter)
+  const list = members.filter((u) => {
+    const matchTipo = filter === 'all' || (u.tipoPersona || 'natural') === filter
+    const texto = `${clientName(u)} ${u.email || ''} ${u.dni || ''}`.toLowerCase()
+    return matchTipo && texto.includes(search.toLowerCase())
+  })
+
+  useEffect(() => { setPage(1) }, [filter, search])
+
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = list.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   const row = selected ? members.find((m) => m.uid === selected) : null
 
@@ -135,120 +145,127 @@ export default function AdminMembers() {
           ))}
         </div>
 
+        <input
+          type="text"
+          className="input"
+          style={{ marginBottom: '14px', maxWidth: '420px' }}
+          placeholder="Buscar por nombre, empresa, correo o cédula..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
         {loading ? (
           <div className="loading">{t('cat.loading')}</div>
         ) : list.length === 0 ? (
           <div className="panel-empty"><p>{t('admin.membersEmpty')}</p></div>
         ) : (
-          <div className="table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>{t('admin.table.student')}</th>
-                  <th>{t('home.email')}</th>
-                  <th>{t('profile.personType')}</th>
-                  <th>Plan de afiliación</th>
-                  <th>{t('admin.memberSince')}</th>
-                  <th>{t('admin.memberStatus')}</th>
-                  <th>{t('admin.actions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((u) => (
-                  <tr key={u.uid}>
-                    <td>
-                      <div className="admin-student">
-                        {u.foto ? (
-                          <img src={u.foto} alt="" className="admin-thumb" />
-                        ) : (
-                          <span className="admin-thumb admin-thumb-initial">{clientName(u).charAt(0)}</span>
-                        )}
-                        <div>
-                          <strong>{clientName(u)}</strong>
-                          <span className="list-sub">{u.nombres} {u.apellidos}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{u.email}</td>
-                    <td><TypeBadge user={u} /></td>
-                    <td>
-                      {u.afiliado === false ? (
-                        <span className="badge badge-noafiliado">Sin plan</span>
-                      ) : (
-                        <span className="badge badge-type">{planLabel(u.tipoAfiliacion)}</span>
-                      )}
-                    </td>
-                    <td>{formatDate(u.fechaRegistro, lang)}</td>
-                    <td><StatusBadge user={u} /></td>
-                    <td>
-                      <div className="member-actions">
-                        <button className="btn btn-outline btn-sm" onClick={() => setSelected(u.uid)}>
-                          {t('admin.view')}
-                        </button>
-                        {u.afiliado === false ? (
-                          <>
-                            <select
-                              className="input"
-                              style={{ maxWidth: '130px' }}
-                              value={planFor(u.uid, u.tipoAfiliacion)}
-                              onChange={(event) =>
-                                setPlanDraft((prev) => ({ ...prev, [u.uid]: event.target.value }))
-                              }
-                              aria-label="Plan de afiliación"
-                            >
-                              <option value="individual">Individual</option>
-                              <option value="corporativo">Corporativo</option>
-                            </select>
-                            <button
-                              className="btn btn-outline btn-sm"
-                              disabled={busy === u.uid}
-                              onClick={() => makeAffiliate(u)}
-                            >
-                              Hacer afiliado
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            className="btn btn-outline btn-sm"
-                            disabled={busy === u.uid}
-                            onClick={() =>
-                              run(u.uid, 'admin.confirmDeaffiliate', {
-                                afiliado: false,
-                                tipoAfiliacion: null,
-                                planAfiliacion: null,
-                                afiliadoDesde: null
-                              })
-                            }
-                          >
-                            <FaUserSlash /> {t('admin.deaffiliateMember')}
-                          </button>
-                        )}
-                        <button
-                          className={`btn btn-sm ${u.bloqueado ? 'btn-outline' : 'btn-danger-outline'}`}
-                          disabled={busy === u.uid}
-                          onClick={() =>
-                            u.bloqueado
-                              ? run(u.uid, 'admin.confirmUnblock', { bloqueado: false })
-                              : run(u.uid, 'admin.confirmBlock', { bloqueado: true, bloqueadoFecha: Date.now() })
-                          }
-                        >
-                          {u.bloqueado ? <FaLockOpen /> : <FaBan />}
-                          {u.bloqueado ? t('admin.unblockMember') : t('admin.blockMember')}
-                        </button>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          disabled={busy === u.uid}
-                          onClick={() => removeUser(u.uid)}
-                          title={t('admin.deleteMember') || 'Eliminar'}
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="members-grid">
+            {pageItems.map((u) => (
+              <div className="member-card" key={u.uid}>
+                <div className="member-card-head">
+                  <div className="admin-student">
+                    {u.foto ? (
+                      <img src={u.foto} alt="" className="admin-thumb" />
+                    ) : (
+                      <span className="admin-thumb admin-thumb-initial">{clientName(u).charAt(0)}</span>
+                    )}
+                    <div>
+                      <strong>{clientName(u)}</strong>
+                      <span className="list-sub">{u.nombres} {u.apellidos}</span>
+                    </div>
+                  </div>
+                  <StatusBadge user={u} />
+                </div>
+
+                <div className="member-card-meta">
+                  <div><span>{t('home.email')}:</span> {u.email || t('admin.notProvided')}</div>
+                  <div><span>{t('profile.personType')}:</span> <TypeBadge user={u} /></div>
+                  <div>
+                    <span>Plan:</span>{' '}
+                    {u.afiliado === false
+                      ? <span className="badge badge-noafiliado">Sin plan</span>
+                      : <span className="badge badge-type">{planLabel(u.tipoAfiliacion)}</span>}
+                  </div>
+                  <div><span>{t('admin.memberSince')}:</span> {formatDate(u.fechaRegistro, lang)}</div>
+                </div>
+
+                <div className="member-actions">
+                  <button className="btn btn-outline btn-sm" onClick={() => setSelected(u.uid)}>
+                    {t('admin.view')}
+                  </button>
+                  {u.afiliado === false ? (
+                    <>
+                      <select
+                        className="input"
+                        style={{ maxWidth: '130px' }}
+                        value={planFor(u.uid, u.tipoAfiliacion)}
+                        onChange={(event) =>
+                          setPlanDraft((prev) => ({ ...prev, [u.uid]: event.target.value }))
+                        }
+                        aria-label="Plan de afiliación"
+                      >
+                        <option value="individual">Individual</option>
+                        <option value="corporativo">Corporativo</option>
+                      </select>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        disabled={busy === u.uid}
+                        onClick={() => makeAffiliate(u)}
+                      >
+                        Hacer afiliado
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn-outline btn-sm"
+                      disabled={busy === u.uid}
+                      onClick={() =>
+                        run(u.uid, 'admin.confirmDeaffiliate', {
+                          afiliado: false,
+                          tipoAfiliacion: null,
+                          planAfiliacion: null,
+                          afiliadoDesde: null
+                        })
+                      }
+                    >
+                      <FaUserSlash /> {t('admin.deaffiliateMember')}
+                    </button>
+                  )}
+                  <button
+                    className={`btn btn-sm ${u.bloqueado ? 'btn-outline' : 'btn-danger-outline'}`}
+                    disabled={busy === u.uid}
+                    onClick={() =>
+                      u.bloqueado
+                        ? run(u.uid, 'admin.confirmUnblock', { bloqueado: false })
+                        : run(u.uid, 'admin.confirmBlock', { bloqueado: true, bloqueadoFecha: Date.now() })
+                    }
+                  >
+                    {u.bloqueado ? <FaLockOpen /> : <FaBan />}
+                    {u.bloqueado ? t('admin.unblockMember') : t('admin.blockMember')}
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    disabled={busy === u.uid}
+                    onClick={() => removeUser(u.uid)}
+                    title={t('admin.deleteMember') || 'Eliminar'}
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && list.length > 0 && (
+          <div className="members-pagination">
+            <button className="btn btn-outline btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+              ← Anterior
+            </button>
+            <span>Página {currentPage} de {totalPages} · {list.length} afiliados</span>
+            <button className="btn btn-outline btn-sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+              Siguiente →
+            </button>
           </div>
         )}
       </section>
