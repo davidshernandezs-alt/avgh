@@ -1051,6 +1051,7 @@ function InscribedTab() {
                   <th>Teléfono</th>
                   <th>Correo</th>
                   <th>Categoría</th>
+                  <th>Pago</th>
                 </tr>
               </thead>
               <tbody>
@@ -1063,6 +1064,7 @@ function InscribedTab() {
                     <td>{p.telefono || '—'}</td>
                     <td>{p.email || '—'}</td>
                     <td>{p.categoria || '—'}</td>
+                    <td>{p.pago || 'Sin dato (pendiente)'}</td>
                   </tr>
                 ))}
               </tbody>

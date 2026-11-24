@@ -143,7 +143,10 @@ function normalizarFila({ headers, values }) {
   const categoria = get(CANON.categoria)
   const factura = get(CANON.factura)
   const pagoRaw = get(CANON.pago)
-  const pagado = !pagoRaw || (lower(pagoRaw).includes('pagado') && !lower(pagoRaw).includes('por pagar'))
+  // Solo "PAGADO" cuenta como pagado. "POR PAGAR" y las celdas vacías quedan
+  // como pendientes, para que el sistema refleje fielmente quién pagó y quién no.
+  const pagoNorm = lower(pagoRaw)
+  const pagado = pagoNorm.includes('pagado') && !pagoNorm.includes('por pagar')
 
   // "NOMBRE APELLIDOS" a veces viene junto en la columna de apellidos
   let apellidosFinal = apellidos
@@ -170,6 +173,7 @@ function normalizarFila({ headers, values }) {
     cargo,
     categoria,
     factura,
+    pago: pagoRaw,
     pagado,
     fechaInscripcion,
     ...meta
@@ -191,6 +195,36 @@ export function parsearExcelInscritos({ arrayBuffer }) {
       if (p) people.push({ ...p, hoja: sheetName.trim() })
     }
   }
+
+  // En la planilla, cuando varias personas de la MISMA EMPRESA van en un mismo
+  // pago, el estado (PAGADO / POR PAGAR) solo se escribe en la primera fila y
+  // las demás quedan vacías. Heredamos ese estado por empresa (dentro de cada
+  // hoja) para no marcar como pendiente a alguien cuya factura ya fue pagada.
+  const estadoPorEmpresa = new Map()
+  for (const p of people) {
+    const empresa = keyOf(p.empresa)
+    if (!empresa || !p.pago) continue
+    const key = `${p.hoja}::${empresa}`
+    const estado = estadoPorEmpresa.get(key) || { pagado: false, porPagar: false }
+    const pago = lower(p.pago)
+    if (pago.includes('pagado') && !pago.includes('por pagar')) estado.pagado = true
+    else estado.porPagar = true
+    estadoPorEmpresa.set(key, estado)
+  }
+  for (const p of people) {
+    if (p.pago) continue
+    const empresa = keyOf(p.empresa)
+    if (!empresa) continue
+    const estado = estadoPorEmpresa.get(`${p.hoja}::${empresa}`)
+    if (estado?.pagado) {
+      p.pagado = true
+      p.pago = 'PAGADO (por empresa)'
+    } else if (estado?.porPagar) {
+      p.pagado = false
+      p.pago = 'POR PAGAR (por empresa)'
+    }
+  }
+
   return { people, porHoja }
 }
 
