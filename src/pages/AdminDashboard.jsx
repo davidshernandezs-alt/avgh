@@ -52,6 +52,8 @@ export default function AdminDashboard() {
   }, [filteredSurvey])
 
   const [selectedActId, setSelectedActId] = useState(actividades[0]?.id || '')
+  const [openPanel, setOpenPanel] = useState('') // 'inscripcion' | 'afiliacion' | 'certificados'
+  const togglePanel = (name) => setOpenPanel((p) => (p === name ? '' : name))
   const [manualForm, setManualForm] = useState({
     nombres: '',
     apellidos: '',
@@ -277,9 +279,25 @@ export default function AdminDashboard() {
 
       {/* Control Visual de Aforo / Sillas por Curso */}
       <section className="panel">
-        <div className="panel-head">
-          <FaChair />
-          <h3>AFORO</h3>
+        <div className="panel-head" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FaChair />
+            <h3>AFORO</h3>
+          </div>
+          <div className="btn-row">
+            <button className={`btn btn-sm ${openPanel === 'asistencia' ? 'btn-primary' : 'btn-outline'}`} onClick={() => togglePanel('asistencia')}>
+              <FaCircleCheck /> Listado de Asistencia
+            </button>
+            <button className={`btn btn-sm ${openPanel === 'inscripcion' ? 'btn-primary' : 'btn-outline'}`} onClick={() => togglePanel('inscripcion')}>
+              <FaPlus /> Inscripción
+            </button>
+            <button className={`btn btn-sm ${openPanel === 'afiliacion' ? 'btn-primary' : 'btn-outline'}`} onClick={() => togglePanel('afiliacion')}>
+              <FaUserCheck /> Afiliación Manual
+            </button>
+            <button className={`btn btn-sm ${openPanel === 'certificados' ? 'btn-primary' : 'btn-outline'}`} onClick={() => togglePanel('certificados')}>
+              <FaAward /> Generador de Certificados
+            </button>
+          </div>
         </div>
 
         <div className="field-label" style={{ maxWidth: '400px', marginBottom: '16px' }}>
@@ -342,6 +360,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Listado rápido de asistencia para marcar con un click */}
+          {openPanel === 'asistencia' && (
           <div style={{ marginTop: '20px' }}>
             <h4 style={{ fontSize: '15px', marginBottom: '10px' }}>Listado de Asistencia del Evento (Marcar / Desmarcar Asistencia)</h4>
             {courseInscripciones.length === 0 ? (
@@ -390,10 +409,12 @@ export default function AdminDashboard() {
               </ul>
             )}
           </div>
+          )}
         </div>
       </section>
 
       {/* Inscripción Manual / Mismo Día */}
+      {openPanel === 'inscripcion' && (
       <section className="panel">
         <div className="panel-head">
           <FaPlus />
@@ -484,8 +505,10 @@ export default function AdminDashboard() {
           </div>
         </form>
       </section>
+      )}
 
       {/* Módulo de Afiliación Manual por el Administrador */}
+      {openPanel === 'afiliacion' && (
       <section className="panel">
         <div className="panel-head">
           <FaUserCheck />
@@ -601,8 +624,10 @@ export default function AdminDashboard() {
           </div>
         </form>
       </section>
+      )}
 
       {/* Generador de Certificados */}
+      {openPanel === 'certificados' && (
       <section className="panel">
         <div className="panel-head">
           <FaAward />
@@ -667,6 +692,7 @@ export default function AdminDashboard() {
           </table>
         </div>
       </section>
+      )}
 
       {/* Encuestas de satisfacción */}
       <section className="panel">

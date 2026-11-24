@@ -2169,31 +2169,38 @@ textarea {
 
 .table-wrap {
   overflow-x: auto;
+  overflow-y: hidden;
   border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
 }
 
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13.5px;
-  min-width: 720px;
+  font-size: 12px;
+  min-width: 0;
+  table-layout: auto;
 }
 
 .admin-table th {
   text-align: left;
-  padding: 10px 12px;
+  padding: 8px 8px;
   background: var(--bg);
   color: var(--navy);
-  font-size: 12px;
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.2px;
   border-bottom: 1px solid var(--border);
+  white-space: normal;
+  word-break: break-word;
 }
 
 .admin-table td {
-  padding: 10px 12px;
+  padding: 8px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  font-size: 12px;
+  word-break: break-word;
 }
 
 .admin-table tbody tr:hover {
@@ -2295,7 +2302,13 @@ textarea {
     padding: 12px 10px 32px;
   }
   .admin-table {
-    min-width: 600px;
+    min-width: 0;
+    font-size: 11px;
+  }
+  .admin-table th,
+  .admin-table td {
+    padding: 7px 6px;
+    font-size: 11px;
   }
 }
 

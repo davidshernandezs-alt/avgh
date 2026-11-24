@@ -199,19 +199,13 @@ export default function AdminMembers() {
                         className="input"
                         style={{ maxWidth: '130px' }}
                         value={planFor(u.uid, u.tipoAfiliacion)}
-                        onChange={(event) =>
-                          setPlanDraft((prev) => ({ ...prev, [u.uid]: event.target.value }))
-                        }
+                        onChange={(event) => setPlanDraft((prev) => ({ ...prev, [u.uid]: event.target.value }))}
                         aria-label="Plan de afiliación"
                       >
                         <option value="individual">Individual</option>
                         <option value="corporativo">Corporativo</option>
                       </select>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        disabled={busy === u.uid}
-                        onClick={() => makeAffiliate(u)}
-                      >
+                      <button className="btn btn-outline btn-sm" disabled={busy === u.uid} onClick={() => makeAffiliate(u)}>
                         Hacer afiliado
                       </button>
                     </>
@@ -219,14 +213,7 @@ export default function AdminMembers() {
                     <button
                       className="btn btn-outline btn-sm"
                       disabled={busy === u.uid}
-                      onClick={() =>
-                        run(u.uid, 'admin.confirmDeaffiliate', {
-                          afiliado: false,
-                          tipoAfiliacion: null,
-                          planAfiliacion: null,
-                          afiliadoDesde: null
-                        })
-                      }
+                      onClick={() => run(u.uid, 'admin.confirmDeaffiliate', { afiliado: false, tipoAfiliacion: null, planAfiliacion: null, afiliadoDesde: null })}
                     >
                       <FaUserSlash /> {t('admin.deaffiliateMember')}
                     </button>
@@ -234,21 +221,14 @@ export default function AdminMembers() {
                   <button
                     className={`btn btn-sm ${u.bloqueado ? 'btn-outline' : 'btn-danger-outline'}`}
                     disabled={busy === u.uid}
-                    onClick={() =>
-                      u.bloqueado
-                        ? run(u.uid, 'admin.confirmUnblock', { bloqueado: false })
-                        : run(u.uid, 'admin.confirmBlock', { bloqueado: true, bloqueadoFecha: Date.now() })
-                    }
+                    onClick={() => u.bloqueado
+                      ? run(u.uid, 'admin.confirmUnblock', { bloqueado: false })
+                      : run(u.uid, 'admin.confirmBlock', { bloqueado: true, bloqueadoFecha: Date.now() })}
                   >
                     {u.bloqueado ? <FaLockOpen /> : <FaBan />}
                     {u.bloqueado ? t('admin.unblockMember') : t('admin.blockMember')}
                   </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    disabled={busy === u.uid}
-                    onClick={() => removeUser(u.uid)}
-                    title={t('admin.deleteMember') || 'Eliminar'}
-                  >
+                  <button className="btn btn-danger btn-sm" disabled={busy === u.uid} onClick={() => removeUser(u.uid)} title={t('admin.deleteMember') || 'Eliminar'}>
                     <FaTrash />
                   </button>
                 </div>

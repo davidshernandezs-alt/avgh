@@ -25,7 +25,8 @@ import {
   FaBookOpen,
   FaIdCard,
   FaAward,
-  FaCircleQuestion
+  FaCircleQuestion,
+  FaUserCheck
 } from 'react-icons/fa6'
 import * as XLSX from 'xlsx'
 import { useLang } from '../i18n'
@@ -97,6 +98,21 @@ function RequestsTab() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [showTicket, setShowTicket] = useState(false)
+  const [filterEstado, setFilterEstado] = useState('pendiente')
+
+  const countsEstado = useMemo(() => ({
+    pendiente: rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera').length,
+    aprobada: rows.filter((r) => r.estado === 'confirmada' || r.estado === 'completada' || r.estado === 'confirmed').length,
+    rechazada: rows.filter((r) => r.estado === 'rechazada').length,
+    total: rows.length
+  }), [rows])
+
+  const filteredRequests = useMemo(() => {
+    if (filterEstado === 'all') return rows
+    if (filterEstado === 'pendiente') return rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera')
+    if (filterEstado === 'aprobada') return rows.filter((r) => r.estado === 'confirmada' || r.estado === 'completada' || r.estado === 'confirmed')
+    return rows.filter((r) => r.estado === filterEstado)
+  }, [rows, filterEstado])
 
   const actById = useMemo(() => {
     const m = {}
@@ -164,16 +180,37 @@ function RequestsTab() {
       <AdminAffiliationRequests />
 
       <section className="panel">
-        <div className="panel-head">
-          <FaUserShield />
-          <h3>{t('admin.requestsTitle')}</h3>
+        <div className="panel-head" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FaUserShield />
+            <h3>{t('admin.requestsTitle')}</h3>
+          </div>
+          <div className="btn-row">
+            {[
+              ['pendiente', `Pendientes (${countsEstado.pendiente})`],
+              ['aprobada', `Aprobadas (${countsEstado.aprobada})`],
+              ['rechazada', `Rechazadas (${countsEstado.rechazada})`],
+              ['all', `Todas (${countsEstado.total})`]
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                className={`btn btn-sm ${filterEstado === value ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setFilterEstado(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="btn-row" style={{ marginBottom: '16px' }}>
           <button className="btn btn-outline btn-sm" onClick={exportExcel}>
             <FaFileExcel /> Descargar ventas del día (Excel)
           </button>
         </div>
         {loading ? (
           <div className="loading">{t('cat.loading')}</div>
-        ) : rows.length === 0 ? (
+        ) : filteredRequests.length === 0 ? (
           <div className="panel-empty"><p>{t('admin.requestsEmpty')}</p></div>
         ) : (
           <div className="table-wrap">
@@ -189,7 +226,7 @@ function RequestsTab() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => {
+                {filteredRequests.map((r) => {
                   const act = actById[r.actividadId]
                   const name = clientName(r.user)
 
@@ -1176,28 +1213,26 @@ function InscribedTab() {
                       </span>
                     </td>
                     <td>
-                      <div className="member-actions" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                      <div className="member-actions" style={{ flexWrap: 'nowrap', gap: '4px' }}>
                         {isPresent && canIssueCertificate(r.tipoAsistente) ? (
-                          <button className="btn btn-outline btn-sm" onClick={() => setCertRow(r)}>
-                            <FaAward /> Generar certificado
+                          <button className="btn btn-outline btn-sm" onClick={() => setCertRow(r)} title="Generar certificado">
+                            <FaAward />
                           </button>
                         ) : null}
                         {!isAffiliate && (
                           <>
                             <select
                               className="input"
-                              style={{ maxWidth: '130px' }}
+                              style={{ maxWidth: '100px', fontSize: '11px' }}
                               value={planFor(r.uid)}
-                              onChange={(event) =>
-                                setAffPlan((prev) => ({ ...prev, [r.uid]: event.target.value }))
-                              }
+                              onChange={(event) => setAffPlan((prev) => ({ ...prev, [r.uid]: event.target.value }))}
                               aria-label="Plan de afiliación"
                             >
                               <option value="individual">Individual</option>
                               <option value="corporativo">Corporativo</option>
                             </select>
-                            <button className="btn btn-outline btn-sm" onClick={() => makeAffiliate(r)}>
-                              Hacer Afiliado
+                            <button className="btn btn-outline btn-sm" onClick={() => makeAffiliate(r)} title="Hacer afiliado">
+                              <FaUserCheck />
                             </button>
                           </>
                         )}
