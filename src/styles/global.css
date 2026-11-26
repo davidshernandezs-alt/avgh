@@ -3545,8 +3545,8 @@ textarea {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 6px;
-  padding: 40px 44px 46px;
+  gap: 4px;
+  padding: 28px 36px 26px;
   box-sizing: border-box;
   overflow: visible;
 }
@@ -3565,20 +3565,34 @@ textarea {
   word-break: break-word;
 }
 
+/* Segunda hoja: tamaños reducidos para que el texto (especialmente el
+   facilitador) quepa siempre dentro del borde inferior. */
+.certificate-page-alt .certificate-program {
+  font-size: 11px;
+}
+
+.certificate-page-alt .certificate-program-title {
+  font-size: 16px;
+  padding: 4px 10px;
+  max-width: 94%;
+}
+
 .certificate-page-alt .certificate-objective {
-  font-size: 11.5px;
-  line-height: 1.35;
+  font-size: 10px;
+  line-height: 1.22;
 }
 
 .certificate-page-alt .certificate-modules {
-  font-size: 11px;
-  line-height: 1.3;
-  gap: 2px;
+  font-size: 9.5px;
+  line-height: 1.2;
+  gap: 1px;
+  padding-left: 18px;
 }
 
 .certificate-page-alt .certificate-facilitator {
-  font-size: 11px;
-  line-height: 1.3;
+  font-size: 9.5px;
+  line-height: 1.2;
+  margin-bottom: 2px;
 }
 
 .certificate-stack {

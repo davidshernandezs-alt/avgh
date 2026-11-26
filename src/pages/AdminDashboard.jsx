@@ -53,6 +53,9 @@ export default function AdminDashboard() {
 
   const [selectedActId, setSelectedActId] = useState(actividades[0]?.id || '')
   const [openPanel, setOpenPanel] = useState('') // 'inscripcion' | 'afiliacion' | 'certificados'
+  const [asistenciaSort, setAsistenciaSort] = useState('nombre-asc')
+  const [asistenciaTipo, setAsistenciaTipo] = useState('all')
+  const [asistenciaSearch, setAsistenciaSearch] = useState('')
   const togglePanel = (name) => setOpenPanel((p) => (p === name ? '' : name))
   const [manualForm, setManualForm] = useState({
     nombres: '',
@@ -119,6 +122,38 @@ export default function AdminDashboard() {
     if (!effectiveActId) return []
     return inscripciones.filter((i) => i.actividadId === effectiveActId)
   }, [inscripciones, effectiveActId])
+
+  // Listado de asistencia con búsqueda, filtro por tipo y orden configurable
+  const attendanceList = useMemo(() => {
+    const q = asistenciaSearch.trim().toLowerCase()
+    let out = courseInscripciones.filter((i) => {
+      const u = i.user || {}
+      const matchTipo = asistenciaTipo === 'all' || (i.tipoAsistente || 'regular') === asistenciaTipo
+      const matchSearch = !q || [u.nombres, u.apellidos, u.dni, u.cedula, u.email, u.empresa, u.nombreEmpresa]
+        .some((v) => String(v || '').toLowerCase().includes(q))
+      return matchTipo && matchSearch
+    })
+    const nameOf = (i) => `${i.user?.nombres || ''} ${i.user?.apellidos || ''}`.trim()
+    const empresaOf = (i) => i.user?.nombreEmpresa || i.user?.empresa || ''
+    const tipoOf = (i) => i.tipoAsistente || 'regular'
+    out = [...out].sort((a, b) => {
+      if (asistenciaSort === 'empresa') {
+        const ea = empresaOf(a)
+        const eb = empresaOf(b)
+        if (!ea && eb) return 1
+        if (ea && !eb) return -1
+        const c = ea.localeCompare(eb, 'es')
+        return c !== 0 ? c : nameOf(a).localeCompare(nameOf(b), 'es')
+      }
+      if (asistenciaSort === 'tipo') {
+        const c = tipoOf(a).localeCompare(tipoOf(b), 'es')
+        return c !== 0 ? c : nameOf(a).localeCompare(nameOf(b), 'es')
+      }
+      if (asistenciaSort === 'nombre-desc') return nameOf(b).localeCompare(nameOf(a), 'es')
+      return nameOf(a).localeCompare(nameOf(b), 'es')
+    })
+    return out
+  }, [courseInscripciones, asistenciaSort, asistenciaTipo, asistenciaSearch])
 
   const selectedAct = actividades.find((a) => a.id === effectiveActId)
   const cupoNum = Number(selectedAct?.cupo)
@@ -380,11 +415,51 @@ export default function AdminDashboard() {
           {openPanel === 'asistencia' && (
           <div style={{ marginTop: '20px' }}>
             <h4 style={{ fontSize: '15px', marginBottom: '10px' }}>Listado de Asistencia del Evento (Marcar / Desmarcar Asistencia)</h4>
-            {courseInscripciones.length === 0 ? (
-              <p className="auth-hint">No hay inscritos en este evento aún.</p>
+            <div className="btn-row" style={{ marginBottom: '12px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                className="input"
+                style={{ maxWidth: '360px' }}
+                placeholder="Buscar por cédula, nombre, apellido, correo o empresa..."
+                value={asistenciaSearch}
+                onChange={(e) => setAsistenciaSearch(e.target.value)}
+                aria-label="Buscar en lista de asistencia"
+              />
+              <select
+                className="input"
+                style={{ maxWidth: '230px' }}
+                value={asistenciaSort}
+                onChange={(e) => setAsistenciaSort(e.target.value)}
+                aria-label="Ordenar lista de asistencia"
+              >
+                <option value="nombre-asc">Orden: Nombre A-Z</option>
+                <option value="nombre-desc">Orden: Nombre Z-A</option>
+                <option value="empresa">Orden: Por empresa</option>
+                <option value="tipo">Orden: Por tipo de asistente</option>
+              </select>
+              <select
+                className="input"
+                style={{ maxWidth: '210px' }}
+                value={asistenciaTipo}
+                onChange={(e) => setAsistenciaTipo(e.target.value)}
+                aria-label="Filtrar por tipo de asistente"
+              >
+                <option value="all">Todos los tipos</option>
+                <option value="regular">Asistentes</option>
+                <option value="facilitador">Facilitadores</option>
+                <option value="invitado">Invitados</option>
+                <option value="junta">Junta Directiva</option>
+                <option value="exonerado">Exonerados</option>
+              </select>
+            </div>
+            <p className="auth-hint" style={{ marginBottom: '8px' }}>
+              Mostrando {attendanceList.length} de {courseInscripciones.length} inscritos
+            </p>
+            {attendanceList.length === 0 ? (
+              <p className="auth-hint">No hay inscritos que coincidan con la búsqueda.</p>
             ) : (
               <ul className="list">
-                {courseInscripciones.map((ins) => {
+                {attendanceList.map((ins) => {
                   const isPresent = ins.presente === true
                   return (
                     <li key={`${ins.uid}-${ins.actividadId}`} className="list-item flex-wrap">
