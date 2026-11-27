@@ -7,7 +7,7 @@ import { db, DB_ROOT } from '../firebase'
 import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
 import { CURRENCY } from '../config'
-import { viewReceipt, downloadReceipt } from '../utils/receiptFile'
+import { getReceipt, isPdfUrl, viewReceipt, downloadReceipt } from '../utils/receiptFile'
 
 const paymentLabels = {
   transfer: 'insc.payment.transfer',
@@ -64,6 +64,7 @@ export default function AdminPayments() {
   const { rows, loading, error } = useAllFacturas()
   const [week, setWeek] = useState('all')
   const [month, setMonth] = useState('all')
+  const [onlyWithReceipt, setOnlyWithReceipt] = useState(false)
   const [selected, setSelected] = useState({})
   const [deleting, setDeleting] = useState(false)
   const [bulkMsg, setBulkMsg] = useState('')
@@ -81,7 +82,7 @@ export default function AdminPayments() {
     if (!window.confirm('¿Marcar esta factura como pagada y confirmar la inscripción?')) return
     try {
       if (r.actividadId) {
-        await setInscripcionEstado({ uid: r.uid, actividadId: r.actividadId, estado: 'confirmada' })
+        await setInscripcionEstado({ uid: r.uid, actividadId: r.actividadId, estado: 'confirmada', confirmarPago: true })
       } else {
         await update(ref(db, `${DB_ROOT}/facturas/${r.uid}/${r.facturaId}`), {
           estado: 'completada',
@@ -113,8 +114,15 @@ export default function AdminPayments() {
   const inMonth = (ts) => (month === 'all' ? true : monthKey(ts) === month)
 
   const filtered = rows.filter(
-    (r) => r.factura?.fecha && inWeek(r.factura.fecha) && inMonth(r.factura.fecha)
+    (r) =>
+      r.factura?.fecha &&
+      inWeek(r.factura.fecha) &&
+      inMonth(r.factura.fecha) &&
+      (!onlyWithReceipt || Boolean(r.factura?.comprobante))
   )
+  const pendientesConComprobante = rows.filter(
+    (r) => r.factura?.comprobante && r.factura?.estado !== 'completada'
+  ).length
   const total = filtered.reduce((s, r) => s + (Number(r.factura.monto) || 0), 0)
 
   const rowKey = (r) => `${r.uid}__${r.facturaId}`
@@ -196,6 +204,13 @@ export default function AdminPayments() {
               ))}
             </select>
           </label>
+          <button
+            className={`btn btn-sm ${onlyWithReceipt ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setOnlyWithReceipt((v) => !v)}
+            title="Mostrar solo facturas con comprobante de pago"
+          >
+            <FaFilePdf /> Con comprobante ({pendientesConComprobante} pendientes)
+          </button>
         </div>
 
         <div className="total-bar">
@@ -317,13 +332,25 @@ export default function AdminPayments() {
                       <td><FacturaBadge estado={r.factura.estado} /></td>
                       <td>
                         {r.factura.comprobante ? (
-                          <div className="btn-row btn-row-sm">
-                            <button className="btn btn-outline btn-sm" onClick={() => viewReceipt(r.factura.comprobante)} title="Ver comprobante">
-                              <FaFilePdf /> Ver
-                            </button>
-                            <button className="btn btn-outline btn-sm" onClick={() => downloadReceipt(r.factura.comprobante, r.factura.comprobanteNombre)} title="Descargar comprobante">
-                              ↓
-                            </button>
+                          <div className="payment-receipt-cell">
+                            {!isPdfUrl(r.factura.comprobante) && (
+                              <button className="receipt-thumb-link" onClick={() => viewReceipt(r.factura.comprobante)} title="Ver comprobante ampliado">
+                                <img src={getReceipt(r.factura.comprobante)?.url} alt="Comprobante" className="receipt-thumb" />
+                              </button>
+                            )}
+                            <div className="btn-row btn-row-sm">
+                              <button className="btn btn-outline btn-sm" onClick={() => viewReceipt(r.factura.comprobante)} title="Ver comprobante">
+                                <FaFilePdf /> Ver
+                              </button>
+                              <button className="btn btn-outline btn-sm" onClick={() => downloadReceipt(r.factura.comprobante, r.factura.comprobanteNombre)} title="Descargar comprobante">
+                                ↓
+                              </button>
+                              {r.factura.estado !== 'completada' && (
+                                <button className="btn btn-primary btn-sm" onClick={() => markPaid(r)} title="Validar pago y confirmar inscripción">
+                                  <FaCheck /> Validar
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <span className="receipt-no">—</span>

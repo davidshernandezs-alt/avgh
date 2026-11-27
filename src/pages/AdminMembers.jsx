@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
-import { FaUsers, FaXmark, FaBuilding, FaUser, FaBan, FaUserSlash, FaLockOpen, FaTrash } from 'react-icons/fa6'
+import { useState, useEffect, useRef } from 'react'
+import { FaUsers, FaXmark, FaBuilding, FaUser, FaBan, FaUserSlash, FaLockOpen, FaTrash, FaPen, FaFileExcel, FaUpload } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAllUsers, useAllCompaniesEmployees, setUserEstado, deleteUserAccount } from '../data/useData'
 import { formatDate } from '../components/ActivityCard'
+import AdminEditPersonModal from '../components/AdminEditPersonModal'
+import { parsearExcelAfiliados, importarAfiliados, descargarPlantillaAfiliados } from '../data/affiliateImport'
 
 function clientName(user) {
   const full = `${user?.nombres || ''} ${user?.apellidos || ''}`.trim()
@@ -40,8 +42,14 @@ export default function AdminMembers() {
   const [sortBy, setSortBy] = useState('nombre-asc')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState(null)
+  const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(null)
   const [planDraft, setPlanDraft] = useState({})
+  const [preview, setPreview] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [updateExisting, setUpdateExisting] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const fileInputRef = useRef(null)
   const PAGE_SIZE = 9
 
   const members = items.filter((u) => u.rol !== 'admin')
@@ -86,6 +94,47 @@ export default function AdminMembers() {
       window.alert(t('admin.errorSave') || 'Error')
     } finally {
       setBusy(null)
+    }
+  }
+
+  const handlePreviewExcel = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setImportMsg('')
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const { people, porHoja } = parsearExcelAfiliados({ arrayBuffer })
+      if (!people.length) {
+        setImportMsg('No se encontraron registros válidos (nombre/razón social + cédula o RIF).')
+        setPreview(null)
+      } else {
+        setPreview({ people, porHoja, arrayBuffer })
+      }
+    } catch {
+      setImportMsg('No se pudo leer el archivo. Verifica que sea un Excel válido.')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  const confirmarImportacion = async () => {
+    if (!preview) return
+    setUploading(true)
+    setImportMsg('Importando afiliados...')
+    try {
+      const result = await importarAfiliados({ arrayBuffer: preview.arrayBuffer, actualizarExistentes: updateExisting })
+      const partes = [`Creados: ${result.created.length}`]
+      if (result.actualizados.length) partes.push(`Actualizados: ${result.actualizados.length}`)
+      if (result.omitidos.length) partes.push(`Omitidos (ya existían): ${result.omitidos.length}`)
+      if (result.errores.length) partes.push(`Errores: ${result.errores.length}`)
+      setImportMsg(`✅ Importación terminada. ${partes.join(' · ')}`)
+      setPreview(null)
+    } catch (err) {
+      setImportMsg(`Error: ${err?.message || 'No se pudo completar la importación.'}`)
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -171,6 +220,72 @@ export default function AdminMembers() {
           <option value="recientes">Orden: Más recientes</option>
         </select>
 
+        <div className="btn-row" style={{ marginBottom: '14px', flexWrap: 'wrap' }}>
+          <button className="btn btn-outline btn-sm" onClick={descargarPlantillaAfiliados}>
+            <FaFileExcel /> Descargar plantilla
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+            <FaUpload /> {uploading ? 'Procesando...' : 'Cargar afiliados desde Excel'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden-input"
+            onChange={handlePreviewExcel}
+          />
+          <label className="checkbox" style={{ margin: 0, fontSize: '13px' }}>
+            <input type="checkbox" checked={updateExisting} onChange={(e) => setUpdateExisting(e.target.checked)} />
+            <span>Actualizar los que ya existan</span>
+          </label>
+        </div>
+
+        {importMsg && (
+          <p className={importMsg.startsWith('✅') ? 'form-success' : 'form-error'} style={{ marginBottom: '14px' }}>
+            {importMsg}
+          </p>
+        )}
+
+        {preview && (
+          <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+            <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>
+              Vista previa: {preview.people.length} afiliado(s)
+            </h4>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="table" style={{ width: '100%', fontSize: '12px' }}>
+                <thead>
+                  <tr>
+                    <th>Nombre / Razón social</th>
+                    <th>Cédula / RIF</th>
+                    <th>Tipo</th>
+                    <th>Plan</th>
+                    <th>Correo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.people.slice(0, 8).map((p, i) => (
+                    <tr key={i}>
+                      <td>{p.nombres} {p.apellidos}</td>
+                      <td>{p.dni || p.rif || '—'}</td>
+                      <td>{p.tipoPersona === 'juridico' ? 'Jurídico' : 'Natural'}</td>
+                      <td>{p.afiliado ? (p.plan === 'corporativo' ? 'Corporativo' : 'Individual') : 'Sin plan'}</td>
+                      <td>{p.email || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="btn-row" style={{ marginTop: '10px' }}>
+              <button className="btn btn-primary btn-sm" onClick={confirmarImportacion} disabled={uploading}>
+                {uploading ? 'Importando...' : '✅ Confirmar e importar'}
+              </button>
+              <button className="btn btn-outline btn-sm" onClick={() => setPreview(null)} disabled={uploading}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="loading">{t('cat.loading')}</div>
         ) : list.length === 0 ? (
@@ -209,6 +324,9 @@ export default function AdminMembers() {
                 <div className="member-actions">
                   <button className="btn btn-outline btn-sm" onClick={() => setSelected(u.uid)}>
                     {t('admin.view')}
+                  </button>
+                  <button className="btn btn-outline btn-sm" onClick={() => setEditing(u)} title="Editar datos del afiliado">
+                    <FaPen /> Editar
                   </button>
                   {u.afiliado === false ? (
                     <>
@@ -355,6 +473,9 @@ export default function AdminMembers() {
                 <li><strong>{t('admin.memberSince')}:</strong> {formatDate(row.fechaRegistro, lang)}</li>
               </ul>
               <div className="member-actions">
+                <button className="btn btn-outline" onClick={() => setEditing(row)}>
+                  <FaPen /> Editar datos
+                </button>
                 <select
                   className="input"
                   style={{ maxWidth: '140px' }}
@@ -408,6 +529,14 @@ export default function AdminMembers() {
           </div>
           </section>
         </div>
+      )}
+
+      {editing && (
+        <AdminEditPersonModal
+          uid={editing.uid}
+          person={editing}
+          onClose={() => setEditing(null)}
+        />
       )}
     </>
   )

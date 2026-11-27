@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
+import { ref, update } from 'firebase/database'
+import { db, DB_ROOT } from '../firebase'
 import {
   FaUserPen,
   FaCheck,
@@ -12,7 +14,8 @@ import {
   FaFilePdf,
   FaImage,
   FaAward,
-  FaLock
+  FaLock,
+  FaCircleCheck
 } from 'react-icons/fa6'
 import { useLang } from '../i18n'
 import { useAuth } from '../auth/AuthContext'
@@ -131,6 +134,30 @@ export default function Profile() {
   const [passBusy, setPassBusy] = useState(false)
   const [surveyBusy, setSurveyBusy] = useState(null)
   const [showSurvey, setShowSurvey] = useState(null)
+  const [notifOculta, setNotifOculta] = useState(false)
+
+  // Inscripción recién aprobada por el admin: aviso pendiente en el perfil.
+  const notifAprobacion = inscripciones.find(
+    (i) => i.aprobadaNotifFecha && i.aprobadaNotifVista !== true
+  )
+  const notifTitulo = notifAprobacion
+    ? actividades.find((a) => a.id === notifAprobacion.actividadId)?.titulo
+    : null
+  const notifNombre = typeof notifTitulo === 'object'
+    ? (notifTitulo?.es || notifTitulo?.en)
+    : notifTitulo
+
+  const marcarNotifVista = async () => {
+    setNotifOculta(true)
+    if (!notifAprobacion || !user?.uid) return
+    try {
+      await update(ref(db, `${DB_ROOT}/inscripciones/${user.uid}/${notifAprobacion.actividadId}`), {
+        aprobadaNotifVista: true
+      })
+    } catch {
+      /* si falla, el aviso se oculta igual en esta sesión */
+    }
+  }
 
   const surveyDone = (actividadId) =>
     !!inscripciones.find((i) => i.actividadId === actividadId)?.encuestaCompletada
@@ -259,6 +286,30 @@ export default function Profile() {
           <h1>{t('profile.title')}</h1>
         </div>
       </div>
+
+      {notifAprobacion && !notifOculta && (
+        <div className="profile-approval-notif" role="status">
+          <FaCircleCheck className="approval-icon" />
+          <div className="approval-text">
+            <strong>¡Tu inscripción fue aprobada!</strong>
+            <span>
+              {notifNombre ? `Inscripción a "${notifNombre}" aprobada. ` : ''}
+              Visualiza tu QR en tu perfil.
+            </span>
+          </div>
+          <div className="approval-actions">
+            <button className="btn btn-primary btn-sm" onClick={() => {
+              setShowQr(notifAprobacion.actividadId)
+              marcarNotifVista()
+            }}>
+              Ver mi QR
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={marcarNotifVista} aria-label="Cerrar aviso">
+              <FaXmark />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Datos personales */}
       <section className="profile-card">
@@ -494,58 +545,6 @@ export default function Profile() {
         )}
       </section>
 
-      {/* Cambiar contraseña */}
-      <section className="panel">
-        <div className="panel-head">
-          <FaLock />
-          <h3>Cambiar contraseña</h3>
-        </div>
-        <p className="auth-hint">
-          Si te registraron en un curso o empresa, tu clave inicial es tu cédula (sin puntos ni guiones).
-          Cámbiala aquí cuando quieras.
-        </p>
-        <form className="form form-pad" onSubmit={handleChangePassword}>
-          <div className="field-row">
-            <label className="field-label">
-              <span>Contraseña actual</span>
-              <input
-                type="password"
-                className="input"
-                value={passForm.current}
-                onChange={(e) => setPassForm({ ...passForm, current: e.target.value })}
-                required
-              />
-            </label>
-            <label className="field-label">
-              <span>Nueva contraseña</span>
-              <input
-                type="password"
-                className="input"
-                value={passForm.next}
-                onChange={(e) => setPassForm({ ...passForm, next: e.target.value })}
-                required
-              />
-            </label>
-            <label className="field-label">
-              <span>Confirmar nueva contraseña</span>
-              <input
-                type="password"
-                className="input"
-                value={passForm.confirm}
-                onChange={(e) => setPassForm({ ...passForm, confirm: e.target.value })}
-                required
-              />
-            </label>
-          </div>
-          {passMsg && <p className={passMsg.includes('correctamente') ? 'form-success' : 'form-error'}>{passMsg}</p>}
-          <div className="btn-row" style={{ marginTop: '12px' }}>
-            <button type="submit" className="btn btn-primary" disabled={passBusy}>
-              {passBusy ? '...' : <><FaLock /> Cambiar contraseña</>}
-            </button>
-          </div>
-        </form>
-      </section>
-
       {/* Acceso a la página de afiliación */}
       <section className="aff-profile-cta">
         <div>
@@ -732,6 +731,58 @@ export default function Profile() {
               })}
           </ul>
         )}
+      </section>
+
+      {/* Cambiar contraseña (debajo de Facturas y pagos) */}
+      <section className="panel">
+        <div className="panel-head">
+          <FaLock />
+          <h3>Cambiar contraseña</h3>
+        </div>
+        <p className="auth-hint">
+          Si te registraron en un curso o empresa, tu clave inicial es tu cédula (sin puntos ni guiones).
+          Cámbiala aquí cuando quieras.
+        </p>
+        <form className="form form-pad" onSubmit={handleChangePassword}>
+          <div className="field-row">
+            <label className="field-label">
+              <span>Contraseña actual</span>
+              <input
+                type="password"
+                className="input"
+                value={passForm.current}
+                onChange={(e) => setPassForm({ ...passForm, current: e.target.value })}
+                required
+              />
+            </label>
+            <label className="field-label">
+              <span>Nueva contraseña</span>
+              <input
+                type="password"
+                className="input"
+                value={passForm.next}
+                onChange={(e) => setPassForm({ ...passForm, next: e.target.value })}
+                required
+              />
+            </label>
+            <label className="field-label">
+              <span>Confirmar nueva contraseña</span>
+              <input
+                type="password"
+                className="input"
+                value={passForm.confirm}
+                onChange={(e) => setPassForm({ ...passForm, confirm: e.target.value })}
+                required
+              />
+            </label>
+          </div>
+          {passMsg && <p className={passMsg.includes('correctamente') ? 'form-success' : 'form-error'}>{passMsg}</p>}
+          <div className="btn-row" style={{ marginTop: '12px' }}>
+            <button type="submit" className="btn btn-primary" disabled={passBusy}>
+              {passBusy ? '...' : <><FaLock /> Cambiar contraseña</>}
+            </button>
+          </div>
+        </form>
       </section>
 
       {showQr && (

@@ -390,20 +390,30 @@ export async function setInscripcionTipoAsistente({ uid, actividadId, tipoAsiste
   })
 }
 
-export async function setInscripcionEstado({ uid, actividadId, estado, nota }) {
+export async function setInscripcionEstado({ uid, actividadId, estado, nota, confirmarPago = false }) {
   const updates = {}
   updates[`${DB_ROOT}/inscripciones/${uid}/${actividadId}/estado`] = estado
   updates[`${DB_ROOT}/inscripciones/${uid}/${actividadId}/validadaFecha`] = Date.now()
+  // Aviso para el participante: se muestra en su perfil hasta que lo vea.
+  if (estado === 'confirmada') {
+    updates[`${DB_ROOT}/inscripciones/${uid}/${actividadId}/aprobadaNotifFecha`] = Date.now()
+    updates[`${DB_ROOT}/inscripciones/${uid}/${actividadId}/aprobadaNotifVista`] = false
+  }
   if (nota !== undefined) {
     updates[`${DB_ROOT}/inscripciones/${uid}/${actividadId}/nota`] = nota || ''
   }
   const snap = await get(ref(db, `${DB_ROOT}/inscripciones/${uid}/${actividadId}`))
   const facturaId = snap.val()?.facturaId
   if (facturaId) {
-    const facturaEstado =
-      estado === 'confirmada' ? 'completada' : estado === 'rechazada' ? 'rechazada' : 'pendiente'
-    updates[`${DB_ROOT}/facturas/${uid}/${facturaId}/estado`] = facturaEstado
-    updates[`${DB_ROOT}/facturas/${uid}/${facturaId}/validadaFecha`] = Date.now()
+    // Aprobar la inscripción NO significa que el pago esté validado.
+    // La factura solo se marca como pagada cuando el admin lo confirma
+    // desde Facturación / Pagos (confirmarPago: true).
+    if (confirmarPago && estado === 'confirmada') {
+      updates[`${DB_ROOT}/facturas/${uid}/${facturaId}/estado`] = 'completada'
+      updates[`${DB_ROOT}/facturas/${uid}/${facturaId}/validadaFecha`] = Date.now()
+    } else if (estado === 'rechazada') {
+      updates[`${DB_ROOT}/facturas/${uid}/${facturaId}/estado`] = 'rechazada'
+    }
   }
   await update(ref(db, '/'), updates)
 }

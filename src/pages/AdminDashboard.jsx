@@ -369,6 +369,13 @@ export default function AdminDashboard() {
 
         <div className="aforo-layout">
           <div className="aforo-stats">
+            <div className="aforo-stat-item is-total">
+              <span className="dot" />
+              <div>
+                <strong>{courseInscripciones.length}</strong>
+                <small>Inscritos en el evento</small>
+              </div>
+            </div>
             <div className="aforo-stat-item is-validated">
               <span className="dot" />
               <div>

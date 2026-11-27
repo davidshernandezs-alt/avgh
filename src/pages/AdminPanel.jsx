@@ -40,8 +40,7 @@ import {
   deleteActividad,
   deleteInscription,
   deleteInscriptionsAndInvoicesBulk,
-  createInscription,
-  setUserAffiliation
+  createInscription
 } from '../data/useData'
 import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
@@ -60,6 +59,8 @@ import AdminDashboard from './AdminDashboard'
 import TicketModal from '../components/TicketModal'
 import CertificateModal from '../components/CertificateModal'
 import AdminQuestions from '../components/AdminQuestions'
+import ScanToast from '../components/ScanToast'
+import AdminEditPersonModal from '../components/AdminEditPersonModal'
 import Toggle from '../components/Toggle'
 import { importarExcelInscritos, parsearExcelInscritos } from '../data/excelImport'
 import { getReceipt, isPdfUrl, viewReceipt, downloadReceipt } from '../utils/receiptFile'
@@ -100,6 +101,7 @@ function RequestsTab() {
   const [msg, setMsg] = useState('')
   const [showTicket, setShowTicket] = useState(false)
   const [filterEstado, setFilterEstado] = useState('pendiente')
+  const [filterActividad, setFilterActividad] = useState('all')
   const [sortBy, setSortBy] = useState('nombre-asc')
   const [search, setSearch] = useState('')
 
@@ -115,6 +117,8 @@ function RequestsTab() {
     if (filterEstado === 'pendiente') out = rows.filter((r) => !r.estado || r.estado === 'pendiente' || r.estado === 'lista_espera')
     else if (filterEstado === 'aprobada') out = rows.filter((r) => r.estado === 'confirmada' || r.estado === 'completada' || r.estado === 'confirmed')
     else if (filterEstado === 'rechazada') out = rows.filter((r) => r.estado === 'rechazada')
+    // Separar por evento/actividad
+    if (filterActividad !== 'all') out = out.filter((r) => r.actividadId === filterActividad)
     // Buscador por nombre, apellido, cédula, correo o empresa
     const q = search.trim().toLowerCase()
     if (q) {
@@ -130,7 +134,7 @@ function RequestsTab() {
       if (sortBy === 'recientes') return (b.fecha || 0) - (a.fecha || 0)
       return nameOf(a).localeCompare(nameOf(b), 'es')
     })
-  }, [rows, filterEstado, sortBy, search])
+  }, [rows, filterEstado, filterActividad, sortBy, search])
 
   const actById = useMemo(() => {
     const m = {}
@@ -218,6 +222,20 @@ function RequestsTab() {
                 {label}
               </button>
             ))}
+            <select
+              className="input"
+              style={{ maxWidth: '260px' }}
+              value={filterActividad}
+              onChange={(e) => setFilterActividad(e.target.value)}
+              aria-label="Filtrar solicitudes por evento"
+            >
+              <option value="all">Todos los eventos</option>
+              {actividades.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {localize(a.titulo, lang)}
+                </option>
+              ))}
+            </select>
             <select
               className="input"
               style={{ maxWidth: '190px' }}
@@ -886,36 +904,16 @@ function InscribedTab() {
   const [preview, setPreview] = useState(null)
   const [selected, setSelected] = useState({})
   const [deleting, setDeleting] = useState(false)
-  const [affPlan, setAffPlan] = useState({})
   const [certRow, setCertRow] = useState(null)
+  const [editRow, setEditRow] = useState(null)
   const excelInputRef = useRef(null)
-
-  const planFor = (uid) => affPlan[uid] || 'individual'
-
-  const makeAffiliate = async (row) => {
-    const plan = planFor(row.uid)
-    const planName = plan === 'corporativo' ? 'corporativo' : 'individual'
-    const participant = `${row.user?.nombres || ''} ${row.user?.apellidos || ''}`.trim() || row.user?.email || 'este participante'
-    if (!window.confirm(`¿Convertir a ${participant} en afiliado ${planName}?`)) return
-    try {
-      await setUserAffiliation({
-        uid: row.uid,
-        tipoAfiliacion: plan,
-        afiliado: true,
-        userData: row.user
-      })
-      alert(`✅ ${participant} quedó como afiliado ${planName} activo.`)
-    } catch (error) {
-      console.error(error)
-      alert('Error al actualizar el estado de afiliado.')
-    }
-  }
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       const name = `${r.user?.nombres || ''} ${r.user?.apellidos || ''} ${r.user?.dni || ''}`.toLowerCase()
       const matchSearch = name.includes(search.toLowerCase())
-      const matchAct = filterAct ? r.actividadId === filterAct : true
+      // Sin curso seleccionado no se muestra información de cursos/inscritos.
+      const matchAct = filterAct ? r.actividadId === filterAct : false
       return matchSearch && matchAct
     })
     .sort((a, b) => {
@@ -1222,7 +1220,11 @@ function InscribedTab() {
       {loading ? (
         <p className="loading">Cargando inscritos...</p>
       ) : filtered.length === 0 ? (
-        <p className="auth-hint">No se encontraron inscripciones con los filtros seleccionados.</p>
+        <p className="auth-hint">
+          {!filterAct
+            ? 'Selecciona un curso / evento para ver los inscritos.'
+            : 'No se encontraron inscripciones con los filtros seleccionados.'}
+        </p>
       ) : (
         <div className="table-wrap">
           <table className="table">
@@ -1276,28 +1278,15 @@ function InscribedTab() {
                     </td>
                     <td>
                       <div className="member-actions" style={{ flexWrap: 'nowrap', gap: '4px' }}>
+                        <button className="btn btn-outline btn-sm" onClick={() => setEditRow(r)} title="Editar datos del participante">
+                          <FaPen />
+                        </button>
                         {isPresent && canIssueCertificate(r.tipoAsistente) ? (
                           <button className="btn btn-outline btn-sm" onClick={() => setCertRow(r)} title="Generar certificado">
                             <FaAward />
                           </button>
                         ) : null}
-                        {!isAffiliate && (
-                          <>
-                            <select
-                              className="input"
-                              style={{ maxWidth: '100px', fontSize: '11px' }}
-                              value={planFor(r.uid)}
-                              onChange={(event) => setAffPlan((prev) => ({ ...prev, [r.uid]: event.target.value }))}
-                              aria-label="Plan de afiliación"
-                            >
-                              <option value="individual">Individual</option>
-                              <option value="corporativo">Corporativo</option>
-                            </select>
-                            <button className="btn btn-outline btn-sm" onClick={() => makeAffiliate(r)} title="Hacer afiliado">
-                              <FaUserCheck />
-                            </button>
-                          </>
-                        )}
+                        {/* La afiliación se gestiona solo en el módulo Afiliaciones. */}
                       </div>
                     </td>
                   </tr>
@@ -1315,6 +1304,15 @@ function InscribedTab() {
           act={actividades.find((a) => a.id === certRow.actividadId)}
           mode="admin"
           onClose={() => setCertRow(null)}
+        />
+      )}
+
+      {editRow && (
+        <AdminEditPersonModal
+          uid={editRow.uid}
+          person={editRow.user}
+          inscripcion={editRow}
+          onClose={() => setEditRow(null)}
         />
       )}
     </section>
@@ -1340,6 +1338,7 @@ export default function AdminPanel() {
 
   return (
     <div className="page">
+      <ScanToast />
       {liveAlert && (
         <div className="admin-live-alert">
           <span>{liveAlert}</span>

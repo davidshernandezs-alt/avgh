@@ -36,9 +36,14 @@ export default function TicketModal({ user, insc, act, factura, onClose }) {
       <div className="qr-modal ticket-modal" onClick={(e) => e.stopPropagation()}>
         <div className="admin-detail-head no-print">
           <h3>{t('profile.qrTicket')}</h3>
-          <button className="btn-icon" onClick={onClose} aria-label={t('admin.close')}>
-            <FaXmark />
-          </button>
+          <div className="btn-row btn-row-sm">
+            <button className="btn btn-primary btn-sm" onClick={handleDownload} disabled={downloading} title="Descargar carnet PDF">
+              <FaDownload /> {downloading ? '...' : 'Descargar'}
+            </button>
+            <button className="btn-icon" onClick={onClose} aria-label={t('admin.close')}>
+              <FaXmark />
+            </button>
+          </div>
         </div>
 
         <div className="ticket-body" id="printable-ticket" ref={ticketRef}>

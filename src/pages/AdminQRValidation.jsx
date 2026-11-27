@@ -7,6 +7,7 @@ import { localize } from '../utils/localized'
 import { formatDate } from '../components/ActivityCard'
 import { useBankConfig } from '../data/useData'
 import { cameraSupport } from '../utils/permissions'
+import { notifyScan } from '../components/ScanToast'
 
 export default function AdminQRValidation() {
   const { t, lang } = useLang()
@@ -210,6 +211,14 @@ export default function AdminQRValidation() {
         insc: updatedInsc,
         act: act || { titulo: { es: 'Curso/Taller', en: 'Course' } },
         factura
+      })
+      notifyScan({
+        nombre: `${user?.nombres || ''} ${user?.apellidos || ''}`.trim() || 'Participante',
+        cedula: user?.dni || user?.cedula || '',
+        empresa: user?.nombreEmpresa || user?.empresa || '',
+        actividad: act?.titulo
+          ? (typeof act.titulo === 'object' ? (act.titulo.es || act.titulo.en) : act.titulo)
+          : ''
       })
       setShowSuccessModal(true)
       // Pausar el escaneo mientras se muestra el resultado para no repetir sonido/lectura
@@ -483,13 +492,15 @@ export default function AdminQRValidation() {
                 muted
                 style={{
                   width: '100%',
-                  maxWidth: '400px',
+                  maxWidth: '280px',
+                  aspectRatio: '1 / 1',
                   height: 'auto',
-                  maxHeight: '60vh',
                   objectFit: 'cover',
                   borderRadius: '8px',
                   border: '3px solid var(--blue)',
-                  background: '#000'
+                  background: '#000',
+                  display: 'block',
+                  margin: '0 auto'
                 }}
               />
               <p className="auth-hint" style={{ marginTop: '6px' }}>Apunte la cámara al código QR del participante...</p>

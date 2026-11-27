@@ -183,9 +183,11 @@ function AuthSection() {
       await sendReset(form.email)
       setSent(true)
     } catch (err) {
-      const c = codeOf(err)
+      const c = String(codeOf(err) || '')
       if (c === 'auth-unavailable') setError(t('home.authUnavailable'))
       else if (c.includes('network')) setError(t('auth.noNetwork'))
+      else if (c.includes('no-email')) setError(t('home.forgotNoEmail'))
+      else if (c.includes('not-found') || c.includes('invalid-email')) setError(t('home.forgotNotFound'))
       else setSent(true)
     } finally {
       setBusy(false)
@@ -323,7 +325,7 @@ function AuthSection() {
           <form onSubmit={handleForgot} className="form">
             <label className="field">
               <FaEnvelope className="field-icon" />
-              <input type="email" placeholder={t('home.email')} value={form.email} onChange={set('email')} autoComplete="email" required />
+              <input type="text" placeholder={t('home.forgotPlaceholder')} value={form.email} onChange={set('email')} autoComplete="email" required />
             </label>
             {error && <p className="form-error">{error}</p>}
             {sent && <p className="form-success">{t('home.forgotSent')}</p>}

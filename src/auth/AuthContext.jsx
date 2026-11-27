@@ -373,10 +373,28 @@ export function AuthProvider({ children }) {
     if (currentAuth) await signOut(currentAuth)
   }
 
-  const sendReset = async (email) => {
+  const sendReset = async (identifier) => {
     const currentAuth = getAuthSafe()
     if (!currentAuth) throw new Error('auth-unavailable')
-    await sendPasswordResetEmail(currentAuth, email.trim())
+    const raw = String(identifier || '').trim()
+    if (!raw) throw new Error('auth/user-not-found')
+
+    let email = raw
+    if (!raw.includes('@')) {
+      // El usuario puede escribir su cédula: buscamos su correo real en el perfil.
+      const digits = raw.replace(/\D/g, '')
+      const snap = await get(ref(db, `${DB_ROOT}/users`))
+      const users = snap.val() || {}
+      const found = Object.values(users).find((u) => {
+        const d = String(u?.dni || u?.cedula || '').replace(/\D/g, '')
+        return digits && (d === digits || d.includes(digits))
+      })
+      if (!found) throw new Error('auth/user-not-found')
+      email = String(found.email || '').trim()
+      if (!email || email.includes('@avgh.local')) throw new Error('auth/no-email')
+    }
+
+    await sendPasswordResetEmail(currentAuth, email.toLowerCase())
   }
 
   const changePassword = async (currentPassword, newPassword) => {

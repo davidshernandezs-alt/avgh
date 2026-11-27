@@ -78,8 +78,11 @@ export default function AdminLogin() {
     try {
       await sendReset(email)
       setSent(true)
-    } catch {
-      setSent(true)
+    } catch (err) {
+      const c = String(err?.code || err?.message || '')
+      if (c.includes('no-email')) setError(t('home.forgotNoEmail'))
+      else if (c.includes('not-found') || c.includes('invalid-email')) setError(t('home.forgotNotFound'))
+      else setSent(true)
     } finally {
       setBusy(false)
     }
@@ -142,8 +145,8 @@ export default function AdminLogin() {
             <label className="field">
               <FaEnvelope className="field-icon" />
               <input
-                type="email"
-                placeholder={t('home.email')}
+                type="text"
+                placeholder={t('home.forgotPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
