@@ -4971,6 +4971,50 @@ textarea {
   to { opacity: 1; transform: translateX(0); }
 }
 
+.admin-notif-stack {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 2999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 36px));
+}
+.admin-notif {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--blue, #3b82f6);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  animation: scanToastIn 0.25s ease-out;
+}
+.admin-notif-registro { border-left-color: #7c3aed; }
+.admin-notif-inscripcion { border-left-color: #f59e0b; }
+.admin-notif-afiliacion { border-left-color: #0ea5e9; }
+.admin-notif-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.admin-notif-body span {
+  color: var(--muted, #6b7280);
+  overflow-wrap: anywhere;
+}
+.admin-notif-close {
+  background: none;
+  border: 0;
+  color: var(--muted, #6b7280);
+  cursor: pointer;
+}
+
 .admin-live-alert {
   position: fixed;
   top: 20px;

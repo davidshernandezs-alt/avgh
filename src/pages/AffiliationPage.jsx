@@ -422,7 +422,8 @@ export default function AffiliationPage() {
         facturaId,
         aceptaTerminos: hasTerms ? acceptTerms : false,
         estado,
-        fecha: now
+        fecha: now,
+        notificarNuevo: 'afiliacion'
       }
 
       await set(ref(db, `${DB_ROOT}/afiliaciones_solicitudes/${user.uid}`), payload)

@@ -46,7 +46,7 @@ import { formatDate } from '../components/ActivityCard'
 import { localize } from '../utils/localized'
 import { fileToStorable } from '../utils/files'
 import { CURRENCY } from '../config'
-import { ref, onValue, off } from 'firebase/database'
+import { ref, onValue, off, update } from 'firebase/database'
 import { db, DB_ROOT } from '../firebase'
 import AdminPayments from './AdminPayments'
 import AdminMembers from './AdminMembers'
@@ -812,8 +812,18 @@ function CoursesTab() {
   )
 }
 
-function useAdminRealtimeAlerts() {
-  const [alertMsg, setAlertMsg] = useState(null)
+function useAdminNotifications() {
+  const [notifs, setNotifs] = useState([])
+
+  const push = (n) => {
+    // Marcar/desmarcar asistencia (incluido el lector QR) nunca genera avisos.
+    if (n.tipo === 'inscripcion' && window.__avghAttendanceUpdateUntil > Date.now()) return
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    setNotifs((prev) => [...prev.slice(-5), { ...n, id, at: Date.now() }])
+    setTimeout(() => {
+      setNotifs((prev) => prev.filter((x) => x.id !== id))
+    }, 10000)
+  }
 
   useEffect(() => {
     const usersRef = ref(db, `${DB_ROOT}/users`)
@@ -821,8 +831,12 @@ function useAdminRealtimeAlerts() {
     const affRef = ref(db, `${DB_ROOT}/afiliaciones_solicitudes`)
 
     let knownUsers = null
-    let initInsc = true
-    let initAff = true
+    let knownInsc = null
+    let knownAff = null
+
+    const clearFlag = (path) => {
+      update(ref(db, path), { notificarNuevo: null }).catch(() => {})
+    }
 
     const playBeep = () => {
       try {
@@ -844,41 +858,68 @@ function useAdminRealtimeAlerts() {
     }
 
     const unsubUsers = onValue(usersRef, (snap) => {
-      const keys = Object.keys(snap.val() || {})
+      const val = snap.val() || {}
+      const keys = Object.keys(val)
       if (!knownUsers) {
         knownUsers = new Set(keys)
         return
       }
-      const hasNewUser = keys.some((key) => !knownUsers.has(key))
+      const nuevos = keys.filter((k) => !knownUsers.has(k))
       knownUsers = new Set(keys)
-      if (!hasNewUser) return
+      if (!nuevos.length) return
+      const u = val[nuevos[0]] || {}
+      if (u.notificarNuevo !== 'registro') return
+      const nombre = `${u.nombres || ''} ${u.apellidos || ''}`.trim() || u.email || 'Nuevo usuario'
       playBeep()
-      setAlertMsg('🔔 ¡Nuevo usuario registrado en el sistema!')
-      setTimeout(() => setAlertMsg(null), 8000)
+      push({ tipo: 'registro', titulo: '🆕 Nuevo registro', detalle: nombre, tab: 'members' })
+      clearFlag(`${DB_ROOT}/users/${nuevos[0]}`)
     })
 
-    const unsubInsc = onValue(inscRef, () => {
-      if (initInsc) {
-        initInsc = false
+    // Solo avisamos cuando aparece una inscripción NUEVA. Actualizar asistencia
+    // desde el lector QR (presente/fechaAsistencia) no cuenta como inscripción.
+    const unsubInsc = onValue(inscRef, (snap) => {
+      const val = snap.val() || {}
+      const keys = []
+      Object.entries(val).forEach(([uid, acts]) => {
+        Object.keys(acts || {}).forEach((actId) => keys.push(`${uid}|${actId}`))
+      })
+      if (!knownInsc) {
+        knownInsc = new Set(keys)
         return
       }
+      const nuevos = keys.filter((k) => !knownInsc.has(k))
+      knownInsc = new Set(keys)
+      if (!nuevos.length) return
+      const [uid, actId] = nuevos[0].split('|')
+      const data = val[uid]?.[actId] || {}
+      if (data.notificarNuevo !== 'inscripcion') return
+      const nombre = `${data.user?.nombres || ''} ${data.user?.apellidos || ''}`.trim() || 'Participante'
       playBeep()
-      setAlertMsg('🔔 ¡Nueva inscripción a un curso o taller recibida!')
-      setTimeout(() => setAlertMsg(null), 8000)
+      push({ tipo: 'inscripcion', titulo: '📝 Nueva inscripción', detalle: nombre, tab: 'requests' })
+      clearFlag(`${DB_ROOT}/inscripciones/${uid}/${actId}`)
     })
 
     const unsubAff = onValue(affRef, (snap) => {
-      if (initAff) {
-        initAff = false
+      const val = snap.val() || {}
+      const keys = Object.keys(val)
+      if (!knownAff) {
+        knownAff = new Set(keys)
         return
       }
-      const pending = Object.values(snap.val() || {}).some(
-        (request) => request?.estado === 'pendiente'
-      )
-      if (!pending) return
+      const nuevos = keys.filter((k) => !knownAff.has(k))
+      knownAff = new Set(keys)
+      if (!nuevos.length) return
+      const r = val[nuevos[0]] || {}
+      if (r.notificarNuevo !== 'afiliacion') return
+      const nombre = `${r.user?.nombres || ''} ${r.user?.apellidos || ''}`.trim() || r.nombreEmpresa || 'Solicitante'
       playBeep()
-      setAlertMsg('🔔 ¡Nueva solicitud de afiliación! Revisa los recaudos y aprueba la solicitud.')
-      setTimeout(() => setAlertMsg(null), 8000)
+      push({
+        tipo: 'afiliacion',
+        titulo: '🪪 Nueva solicitud de afiliación',
+        detalle: `${nombre} · ${r.tipo === 'corporativo' ? 'Corporativa' : 'Individual'}`,
+        tab: 'requests'
+      })
+      clearFlag(`${DB_ROOT}/afiliaciones_solicitudes/${nuevos[0]}`)
     })
 
     return () => {
@@ -888,7 +929,34 @@ function useAdminRealtimeAlerts() {
     }
   }, [])
 
-  return alertMsg
+  return {
+    notifs,
+    dismiss: (id) => setNotifs((prev) => prev.filter((x) => x.id !== id))
+  }
+}
+
+function AdminNotifications({ notifs, dismiss, setTab }) {
+  if (!notifs.length) return null
+  return (
+    <div className="admin-notif-stack" aria-live="polite">
+      {notifs.map((n) => (
+        <div className={`admin-notif admin-notif-${n.tipo}`} key={n.id}>
+          <div className="admin-notif-body">
+            <strong>{n.titulo}</strong>
+            <span>{n.detalle}</span>
+          </div>
+          {n.tab && (
+            <button className="btn btn-outline btn-sm" onClick={() => { setTab(n.tab); dismiss(n.id) }}>
+              Ver
+            </button>
+          )}
+          <button className="admin-notif-close" onClick={() => dismiss(n.id)} aria-label="Cerrar aviso">
+            <FaXmark />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function InscribedTab() {
@@ -1323,7 +1391,7 @@ export default function AdminPanel() {
   const { t } = useLang()
   const { profile, logout } = useAuth()
   const [tab, setTab] = useState('requests')
-  const liveAlert = useAdminRealtimeAlerts()
+  const { notifs, dismiss } = useAdminNotifications()
 
   if (profile?.rol !== 'admin') {
     return (
@@ -1339,14 +1407,7 @@ export default function AdminPanel() {
   return (
     <div className="page">
       <ScanToast />
-      {liveAlert && (
-        <div className="admin-live-alert">
-          <span>{liveAlert}</span>
-          <button className="btn btn-primary btn-sm" onClick={() => setTab('requests')}>
-            Ver solicitudes
-          </button>
-        </div>
-      )}
+      <AdminNotifications notifs={notifs} dismiss={dismiss} setTab={setTab} />
       <div className="page-head">
         <Link to="/" className="btn-icon" aria-label={t('admin.goApp')}>
           <FaHouseChimney />

@@ -1,23 +1,50 @@
 import { useEffect, useState } from 'react'
+import { ref, onValue, off, push } from 'firebase/database'
+import { db, DB_ROOT } from '../firebase'
 import { FaCircleCheck, FaXmark } from 'react-icons/fa6'
 
 const EVENT = 'avgh-qr-scan'
 const MAX_VISIBLE = 4
 const DURATION = 8000
 
-// Aviso flotante que muestra quién acaba de llegar al escanear su QR.
-// Escucha el evento global que dispara el validador de asistencia.
+// Aviso flotante de llegada por QR. Escucha tanto el evento local del lector
+// como la lista qr_llegadas de Firebase, para que el aviso se vea también en
+// otra sesión/dispositivo (por ejemplo quien vigila el Dashboard).
 export default function ScanToast() {
   const [toasts, setToasts] = useState([])
 
+  const addToast = (data) => {
+    const key = data.scanId || `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    setToasts((prev) => {
+      if (prev.some((t) => t.scanId === key)) return prev
+      return [...prev.slice(-(MAX_VISIBLE - 1)), { ...data, scanId: key, id: key, at: data.at || Date.now() }]
+    })
+  }
+
   useEffect(() => {
-    const onScan = (e) => {
-      const data = e.detail || {}
-      const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-      setToasts((prev) => [...prev.slice(-(MAX_VISIBLE - 1)), { ...data, id }])
-    }
+    const onScan = (e) => addToast(e.detail || {})
     window.addEventListener(EVENT, onScan)
-    return () => window.removeEventListener(EVENT, onScan)
+    window.__avghShowArrival = addToast
+
+    const r = ref(db, `${DB_ROOT}/qr_llegadas`)
+    let known = null
+    const unsub = onValue(r, (snap) => {
+      const val = snap.val() || {}
+      const keys = Object.keys(val)
+      if (!known) {
+        known = new Set(keys)
+        return
+      }
+      const nuevos = keys.filter((k) => !known.has(k))
+      known = new Set(keys)
+      nuevos.forEach((k) => addToast(val[k] || {}))
+    })
+
+    return () => {
+      window.removeEventListener(EVENT, onScan)
+      delete window.__avghShowArrival
+      off(r, 'value', unsub)
+    }
   }, [])
 
   useEffect(() => {
@@ -54,9 +81,16 @@ export default function ScanToast() {
 }
 
 export function notifyScan(data) {
+  const payload = { ...data, scanId: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, at: Date.now() }
   try {
-    window.dispatchEvent(new CustomEvent(EVENT, { detail: { ...data, at: Date.now() } }))
+    window.__avghShowArrival?.(payload)
+    window.dispatchEvent(new CustomEvent(EVENT, { detail: payload }))
   } catch {
-    /* el aviso es informativo */
+    /* el aviso local es opcional */
+  }
+  try {
+    push(ref(db, `${DB_ROOT}/qr_llegadas`), payload).catch(() => {})
+  } catch {
+    /* si falla, el aviso local sigue funcionando */
   }
 }

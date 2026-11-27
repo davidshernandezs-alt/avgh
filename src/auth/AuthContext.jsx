@@ -363,7 +363,8 @@ export function AuthProvider({ children }) {
       dni: dni ? dni.trim() : '',
       email: userEmail,
       afiliado: data.afiliado === true,
-      fechaRegistro: Date.now()
+      fechaRegistro: Date.now(),
+      notificarNuevo: 'registro'
     })
     return cred.user
   }

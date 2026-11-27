@@ -235,6 +235,7 @@ export async function createInscription({
     monto: montoFinal,
     facturaId,
     presente: inscOld?.presente === true,
+    notificarNuevo: 'inscripcion',
     user: user && typeof user === 'object' ? user : {},
     ...(afiliado !== null ? { afiliado } : {}),
     ...(planAfiliacion ? { planAfiliacion } : {}),

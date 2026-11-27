@@ -198,6 +198,7 @@ export default function AdminQRValidation() {
       }
 
       // Marcar asistencia presencial (presente: true) en la base de datos
+      window.__avghAttendanceUpdateUntil = Date.now() + 2500
       await update(ref(db, `${DB_ROOT}/inscripciones/${foundUid}/${actividadId}`), {
         presente: true,
         fechaAsistencia: Date.now()

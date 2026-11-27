@@ -285,6 +285,7 @@ export default function AdminDashboard() {
     if (!insc) return
     try {
       const newPresente = !insc.presente
+      window.__avghAttendanceUpdateUntil = Date.now() + 2500
       await update(ref(db, `${DB_ROOT}/inscripciones/${insc.uid}/${insc.actividadId}`), {
         presente: newPresente
       })
