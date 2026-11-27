@@ -5,7 +5,8 @@ import { FaCircleCheck, FaXmark } from 'react-icons/fa6'
 
 const EVENT = 'avgh-qr-scan'
 const MAX_VISIBLE = 4
-const DURATION = 8000
+const DURATION = 20000
+const RECENTE_MS = 10 * 60 * 1000
 
 // Aviso flotante de llegada por QR. Escucha tanto el evento local del lector
 // como la lista qr_llegadas de Firebase, para que el aviso se vea también en
@@ -33,6 +34,13 @@ export default function ScanToast() {
       const keys = Object.keys(val)
       if (!known) {
         known = new Set(keys)
+        // Si el panel se abre justo después de un escaneo (por ejemplo en el
+        // Dashboard), mostramos la llegada más reciente para no perder el aviso.
+        const recientes = keys
+          .map((k) => ({ id: k, scanId: val[k]?.scanId || k, ...(val[k] || {}) }))
+          .filter((r) => r.at && Date.now() - r.at < RECENTE_MS)
+          .sort((a, b) => (b.at || 0) - (a.at || 0))
+        if (recientes[0]) addToast(recientes[0])
         return
       }
       const nuevos = keys.filter((k) => !known.has(k))

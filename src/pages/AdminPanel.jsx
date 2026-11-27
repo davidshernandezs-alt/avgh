@@ -91,6 +91,17 @@ function EstadoBadge({ estado }) {
   return <span className={`badge badge-${cls}`}>{label}</span>
 }
 
+// El estado de pago lo define la FACTURA (lo que se valida en Facturación / Pagos),
+// no el estado de la inscripción (que es la aprobación).
+function PagoBadge({ row }) {
+  const { t } = useLang()
+  const estado = row.factura?.estado || (Number(row.monto) === 0 ? 'completada' : 'pendiente')
+  const pagado = estado === 'completada' || estado === 'aprobada'
+  const cls = pagado ? 'Confirmada' : estado === 'rechazada' ? 'Rechazada' : 'pendiente'
+  const label = pagado ? 'Pagado' : estado === 'rechazada' ? t('insc.statusRechazada') : 'Pendiente de pago'
+  return <span className={`badge badge-${cls}`}>{label}</span>
+}
+
 function RequestsTab() {
   const { t, lang } = useLang()
   const { rows, loading, error } = useAllInscripciones()
@@ -1338,7 +1349,7 @@ function InscribedTab() {
                       )}
                     </td>
                     <td>{actTitle(r.actividadId)}</td>
-                    <td><EstadoBadge estado={r.estado} /></td>
+                    <td><PagoBadge row={r} /></td>
                     <td>
                       <span className={`badge badge-${isPresent ? 'Confirmada' : 'pendiente'}`}>
                         {isPresent ? '✅ Presente' : '⏳ Por llegar'}
